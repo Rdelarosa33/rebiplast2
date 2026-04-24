@@ -10,83 +10,116 @@ const USE_OPENAI = false
 // ================================================
 
 const PROMPT = `Eres un experto en leer órdenes de trabajo de talleres automotrices peruanos.
-Analiza esta imagen y extrae los datos según el formato del documento.
+Analiza esta imagen y extrae los datos. Sigue el mapeo exacto por seguro.
 
 ========================
-IDENTIFICAR FORMATO
+PASO 1: DETECTAR SEGURO
 ========================
-Detecta el logo o nombre del seguro: RIMAC, MAPFRE, PACIFICO, LA_POSITIVA, HDI, INTERSEGURO, TALLER
-
-========================
-MAPEO DE CAMPOS POR SEGURO
-========================
-
-RIMAC — hay DOS formatos:
-Formato 1 (Orden de compra simple):
-  - N° Siniestro: campo "Siniestro N°"
-  - N° Orden: campo "N°" al inicio del documento
-  - Póliza: campo "Póliza N°"
-  - Placa: campo "Rodaje"
-  - Marca/Modelo/Año: en tabla de datos del vehículo
-  - Girador: busca "TÉCNICO SINIESTROS" o similar al pie
-Formato 2 (Detalle de aprobación):
-  - N° Orden: campo "NRO DE OC"
-  - N° Siniestro: campo "SINIESTRO"
-  - Póliza: campo "PÓLIZA"
-  - Placa: campo "PLACA"
-  - Girador: campo "TÉCNICO" al pie del documento
-
-MAPFRE (Orden de Trabajo):
-  - N° Orden: el número grande después de "ORDEN DE TRABAJO"
-  - N° Siniestro: campo "SINIESTRO:"
-  - Expediente: campo "EXPEDIENTE:"
-  - Póliza: campo "POLIZA:"
-  - Placa: campo "PLACA:"
-  - VIN: campo "CHASIS:"
-  - Girador: campo "Perito:" al pie del documento
-  - Piezas: en tabla "DESCRIPCIÓN Y EVALUACIÓN DE DAÑOS", filas con prefijo REP
-
-PACIFICO:
-  - N° Orden: campo "Folio:"
-  - N° Siniestro: campo "Siniestro:"
-  - Póliza: campo "Poliza:"
-  - VIN: campo "VIN:"
-  - Placa: campo "Placa:"
-  - Marca: campo "Fabricante:"
-  - Modelo: campo "Modelo:"
-  - Año: campo "Año Vehículo:"
-  - Girador: campo "Nombre Usuario:"
-  - Piezas: filas numeradas (1., 2.) en columna DESCRIPCION, IGNORAR columnas REFERENCIA e IMPORTE
-
-LA_POSITIVA (Orden de Compra):
-  - N° Orden: campo "N° OC-"
-  - N° Siniestro: campo "Siniestro:"
-  - Póliza: campo "Póliza:"
-  - Placa: campo "Placa:"
-  - VIN: campo "N° Serie:"
-  - Girador: campo "Técnico de Vehículos:" al pie
-  - Piezas: en tabla "Cambio/Reparacion por" + "Descripción"
-
-INTERSEGURO:
-  - Girador: siempre "José Fernández" sin buscar en el documento
+Busca estos logos o palabras en la imagen:
+- "RIMAC" → tipo_seguro = RIMAC
+- "MAPFRE" → tipo_seguro = MAPFRE
+- "La Positiva" o "LA POSITIVA" → tipo_seguro = LA_POSITIVA
+- "Pacífico" o "PACIFICO" o "EA Corp" o "Alpiconsult" → tipo_seguro = PACIFICO
+- "INTERSEGURO" o "Qualität" o "AUTOLAND" → tipo_seguro = INTERSEGURO
+- "HDI" → tipo_seguro = HDI
+- Si no hay seguro reconocible → tipo_seguro = TALLER
 
 ========================
-REGLAS PARA PIEZAS
+PASO 2: EXTRAER GIRADOR
 ========================
-- Cada línea o fila con una pieza = un objeto separado
-- "REPARA", "REPARAR", "REP", "REPARACION DE" = requiere_reparacion true, tipo_trabajo "R"
-- "REPARACION Y PINTURA", "RP", "+ Pintura" = requiere_reparacion true, requiere_pintura true, tipo_trabajo "RP"
-- LH = lado Izquierdo, RH = lado Derecho, DELT = Frontal, POST = Posterior
-- FARO, NEBLINERO = es_faro true
-- IGNORAR filas vacías, subtotales, IGV, totales
+Busca CUALQUIERA de estas palabras clave en TODO el documento y extrae el nombre
+que esté al lado o debajo. El primero que encuentres es el girador:
+
+  "Técnico" / "TÉCNICO"
+  "Técnico Siniestros" / "TÉCNICO SINIESTROS"
+  "Técnico de Vehículos"
+  "Perito" / "PERITO"
+  "Asesor" / "ASESOR"
+  "Asesor Técnico"
+  "Ajustador" / "AJUSTADOR"
+  "Nombre Usuario" / "NOMBRE USUARIO"
+  "Realizado por" / "REALIZADO POR"
+  "Jefe de Siniestros"
+  "Jefe de Taller"
+  "Inspector"
+  "Liquidador"
+  "Autorizado por"
+  "VoBo" (el nombre o firma al lado)
+
+EXCEPCIÓN: Si el seguro es INTERSEGURO → girador = "José Fernández" siempre.
 
 ========================
-REGLAS GENERALES
+ (si no identificaste el seguro o no encontraste el girador)
 ========================
-- La PLACA es crítica — búscala aunque esté en campo "Rodaje" u otro nombre
-- No inventes datos — si no lo ves claramente, usa null
+Si el tipo_seguro es OTRO o el nombre_girador sigue en null, busca CUALQUIERA de estas
+palabras clave en TODO el documento y extrae el nombre que esté al lado o debajo:
 
-Devuelve SOLO este JSON sin markdown:
+Palabras clave para girador (en cualquier seguro):
+  "Técnico" / "TÉCNICO"
+  "Perito" / "PERITO"
+  "Asesor" / "ASESOR"
+  "Ajustador" / "AJUSTADOR"
+  "Nombre Usuario" / "NOMBRE USUARIO"
+  "Realizado por" / "REALIZADO POR"
+  "Jefe de Siniestros"
+  "Jefe de Taller"
+  "Asesor Técnico"
+  "Técnico de Vehículos"
+  "Técnico Siniestros"
+  "Inspector"
+  "Liquidador"
+  "Responsable"
+  "Autorizado por"
+  "VoBo" (la firma o nombre al lado)
+
+Palabras clave para taller origen (en cualquier seguro):
+  "Atención a Taller" / "ATENCIÓN A TALLER"
+  "Taller Principal" / "TALLER PRINCIPAL"
+  "Cliente:" (cuando es taller concesionario)
+  "Sede:" o "SEDE"
+  "a los señores [NOMBRE]"
+  "Proveedor:" cuando no es Rebiplast
+
+========================
+PASO 5: EXTRAER PIEZAS
+========================
+Busca la sección de trabajos/servicios y extrae cada pieza:
+
+RIMAC formato 1: tabla con columnas Item/Cantidad/Descripción
+  - Cada fila con descripción es una pieza
+  - "REPARA", "REPARAR" → requiere_reparacion=true, tipo_trabajo="R"
+
+RIMAC formato 2: tabla con columnas CÓDIGO/DESCRIPCIÓN
+  - Filas con "SERVICIO" en CÓDIGO → la DESCRIPCIÓN es la pieza
+  - "REPARACION DE..." → tipo_trabajo="R"
+  - "REPARACION Y PINTURA DE..." → tipo_trabajo="RP", requiere_pintura=true
+
+MAPFRE: tabla "DESCRIPCIÓN Y EVALUACIÓN DE DAÑOS"
+  - Filas con "REP" al inicio → cada línea REP es una pieza separada
+  - Ejemplo: "REP FUNDA DEL" y "REP REJILLA DEL" son 2 piezas diferentes
+
+LA POSITIVA: tabla "Cambio/Reparacion por" + "Descripción"
+  - La descripción después de "Reparación /" es la pieza
+  - Si dice "+ Pintura" → requiere_pintura=true
+
+PACIFICO (EA Corp): tabla "OPERACION/DESCRIPCION"
+  - Cada fila es una pieza
+  - "Reparacion" al final → tipo_trabajo="R"
+  - "Pintura" al final → tipo_trabajo="RP"
+
+INTERSEGURO (Qualität): campo "Observaciones"
+  - "OT POR REPUESTO : FUNDA POST SUP" → pieza = "FUNDA POST SUP"
+
+REGLAS GENERALES PARA PIEZAS:
+  - LH = lado Izquierdo, RH = lado Derecho
+  - DELT o DELANTERA = Frontal, POST o POSTERIOR = Posterior
+  - FARO, NEBLINERO, FARO DELANTERO = es_faro=true
+  - IGNORAR filas de SUBTOTAL, IGV, TOTAL, filas vacías
+
+========================
+FORMATO DE RESPUESTA
+========================
+Devuelve SOLO este JSON sin markdown ni explicaciones:
 {
   "numero_siniestro": null,
   "numero_orden": null,
