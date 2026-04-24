@@ -230,12 +230,13 @@ export default function ImprimirEtiquetasPage() {
         }
 
         .servicios span {
-          font-size: 10px;
-          font-weight: bold;
+          font-size: 12px;
+          font-weight: 900;
           font-family: monospace;
-          border: 1px solid #000;
-          padding: 1px 4px;
+          border: 2px solid #000;
+          padding: 2px 6px;
           border-radius: 3px;
+          color: #000000;
         }
 
         .separador {

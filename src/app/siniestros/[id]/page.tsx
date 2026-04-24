@@ -86,9 +86,11 @@ export default async function SiniestroDetailPage({ params }: { params: Promise<
         </div>
       )}
 
-      {/* Botones de acción */}
+      {/* Botones de acción — QR taller/seguro solo para admin y supervisor */}
       <div className="flex gap-3 flex-wrap">
-        <BotonQR siniestroId={siniestro.id} numeroSiniestro={siniestro.numero_siniestro} />
+        {(profile?.role === 'admin' || profile?.role === 'supervisor') && (
+          <BotonQR siniestroId={siniestro.id} numeroSiniestro={siniestro.numero_siniestro} />
+        )}
         <Link href={`/siniestros/${siniestro.id}/imprimir`}
           className="flex items-center gap-2 bg-[#131920] hover:bg-[#1A2332] border border-[#1E2D42] hover:border-[#00D4FF]/30 text-[#94A3B8] hover:text-white px-3 py-2 rounded-xl text-sm transition-all">
           <Printer size={16} />
