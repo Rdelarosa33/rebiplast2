@@ -152,7 +152,7 @@ export const ROLE_COLOR: Record<UserRole, string> = {
 export const SEGUROS: SeguroTipo[] = ['RIMAC', 'PACIFICO', 'MAPFRE', 'LA_POSITIVA', 'HDI', 'INTERSEGURO', 'TALLER', 'OTRO']
 
 // ================================================
-// LÓGICA DE ACCIONES POR ROL Y ESTADO
+// ACCIONES POR ROL — LÓGICA ESTRICTA
 // ================================================
 
 export interface Accion {
@@ -161,92 +161,165 @@ export interface Accion {
   color: string
   requiere_motivo?: boolean
   descripcion?: string
+  confirmacion?: string  // texto del modal de confirmación
 }
 
 export function getAcciones(estado: PiezaEstado, role: UserRole, pieza?: Partial<Pieza>): Accion[] {
-  const acciones: Accion[] = []
 
+  // ENTREGADO es estado final — nadie puede cambiarlo excepto admin
+  if (estado === 'ENTREGADO' && role !== 'admin') return []
+
+  // ADMIN — puede mover a cualquier estado con confirmación
   if (role === 'admin') {
-    // Admin puede mover a cualquier estado
     const todos: PiezaEstado[] = [
       'REGISTRADO','EN_TRASLADO','RECIBIDO','ASIGNADO',
       'EN_REPARACION','EN_PREPARACION','EN_PINTURA','EN_PULIDO',
-      'CONTROL_CALIDAD','LISTO_ENTREGA','ENTREGADO','DEVUELTO'
+      'CONTROL_CALIDAD','LISTO_ENTREGA','ENTREGADO'
     ]
     return todos
       .filter(e => e !== estado)
-      .map(e => ({ label: ESTADO_LABELS[e], estado_nuevo: e, color: 'btn-secondary' }))
+      .map(e => ({
+        label: `Cambiar a: ${ESTADO_LABELS[e]}`,
+        estado_nuevo: e,
+        color: 'btn-secondary',
+        requiere_motivo: true,
+        confirmacion: `¿Confirmas cambiar el estado a "${ESTADO_LABELS[e]}"? Esta acción quedará registrada.`
+      }))
   }
 
+  const acciones: Accion[] = []
+
+  // RECOJO
   if (role === 'recojo') {
     if (estado === 'REGISTRADO') {
-      acciones.push({ label: 'Marcar en traslado', estado_nuevo: 'EN_TRASLADO', color: 'btn-primary' })
-    }
-  }
-
-  if (role === 'supervisor') {
-    if (estado === 'EN_TRASLADO') {
-      acciones.push({ label: 'Confirmar recepción', estado_nuevo: 'RECIBIDO', color: 'btn-primary', descripcion: 'Confirmar que la pieza llegó al taller' })
-    }
-    if (estado === 'RECIBIDO') {
-      acciones.push({ label: 'Asignar a trabajador', estado_nuevo: 'ASIGNADO', color: 'btn-primary', descripcion: 'Asignar pieza a trabajador de reparación' })
-    }
-    if (estado === 'CONTROL_CALIDAD') {
-      acciones.push({ label: 'Aprobar — Listo para entrega', estado_nuevo: 'LISTO_ENTREGA', color: 'btn-success' })
-      acciones.push({ label: 'Devolver a pintura', estado_nuevo: 'EN_PINTURA', color: 'btn-danger', requiere_motivo: true })
-      acciones.push({ label: 'Devolver a preparación', estado_nuevo: 'EN_PREPARACION', color: 'btn-danger', requiere_motivo: true })
-      acciones.push({ label: 'Devolver a reparación', estado_nuevo: 'EN_REPARACION', color: 'btn-danger', requiere_motivo: true })
+      acciones.push({
+        label: 'Marcar en traslado',
+        estado_nuevo: 'EN_TRASLADO',
+        color: 'btn-primary',
+        confirmacion: '¿Confirmas que la pieza está en camino al taller?'
+      })
     }
     if (estado === 'LISTO_ENTREGA') {
-      acciones.push({ label: 'Confirmar entrega', estado_nuevo: 'ENTREGADO', color: 'btn-success' })
+      acciones.push({
+        label: 'Confirmar entrega al taller',
+        estado_nuevo: 'ENTREGADO',
+        color: 'btn-success',
+        confirmacion: '¿Confirmas que la pieza fue entregada al taller de origen?'
+      })
     }
   }
 
+  // SUPERVISOR
+  if (role === 'supervisor') {
+    if (estado === 'EN_TRASLADO') {
+      acciones.push({
+        label: 'Confirmar recepción en taller',
+        estado_nuevo: 'RECIBIDO',
+        color: 'btn-primary',
+        confirmacion: '¿Confirmas que la pieza llegó al taller y fue recepcionada?'
+      })
+    }
+    if (estado === 'RECIBIDO') {
+      acciones.push({
+        label: 'Asignar a trabajador',
+        estado_nuevo: 'ASIGNADO',
+        color: 'btn-primary',
+        confirmacion: '¿Confirmas la asignación de esta pieza?'
+      })
+    }
+    if (estado === 'CONTROL_CALIDAD') {
+      acciones.push({
+        label: '✓ Aprobar — Listo para entrega',
+        estado_nuevo: 'LISTO_ENTREGA',
+        color: 'btn-success',
+        confirmacion: '¿Confirmas que la pieza pasó el control de calidad y está lista para entrega?'
+      })
+      if (pieza?.requiere_pintura) {
+        acciones.push({
+          label: 'Devolver a pintura',
+          estado_nuevo: 'EN_PINTURA',
+          color: 'btn-danger',
+          requiere_motivo: true,
+          confirmacion: '¿Confirmas la devolución a pintura? Indica el motivo.'
+        })
+        acciones.push({
+          label: 'Devolver a preparación',
+          estado_nuevo: 'EN_PREPARACION',
+          color: 'btn-danger',
+          requiere_motivo: true,
+          confirmacion: '¿Confirmas la devolución a preparación? Indica el motivo.'
+        })
+      }
+      acciones.push({
+        label: 'Devolver a reparación',
+        estado_nuevo: 'EN_REPARACION',
+        color: 'btn-danger',
+        requiere_motivo: true,
+        confirmacion: '¿Confirmas la devolución a reparación? Indica el motivo.'
+      })
+    }
+  }
+
+  // REPARACION
   if (role === 'reparacion') {
     if (estado === 'ASIGNADO' || estado === 'EN_REPARACION') {
-      // Si requiere pintura → va a preparación, si no → directo a control calidad
-      const siguienteEstado = pieza?.requiere_pintura ? 'EN_PREPARACION' : 'CONTROL_CALIDAD'
-      const descripcion = pieza?.requiere_pintura
+      const siguiente = pieza?.requiere_pintura ? 'EN_PREPARACION' : 'CONTROL_CALIDAD'
+      const desc = pieza?.requiere_pintura
         ? 'Reparación completada — pasa a preparación'
         : 'Reparación completada — pasa a control de calidad'
-      acciones.push({ label: 'Marcar como terminado', estado_nuevo: siguienteEstado, color: 'btn-primary', descripcion })
+      acciones.push({
+        label: 'Marcar reparación terminada',
+        estado_nuevo: siguiente,
+        color: 'btn-primary',
+        descripcion: desc,
+        confirmacion: `¿Confirmas que terminaste la reparación? ${desc}`
+      })
     }
   }
 
+  // PREPARACION
   if (role === 'preparacion') {
     if (estado === 'EN_PREPARACION') {
-      acciones.push({ label: 'Marcar como terminado', estado_nuevo: 'EN_PINTURA', color: 'btn-primary', descripcion: 'Preparación completada — pasa a pintura' })
+      acciones.push({
+        label: 'Marcar preparación terminada',
+        estado_nuevo: 'EN_PINTURA',
+        color: 'btn-primary',
+        descripcion: 'Preparación completada — pasa a pintura',
+        confirmacion: '¿Confirmas que terminaste la preparación? La pieza pasa a pintura.'
+      })
     }
   }
 
+  // PINTURA
   if (role === 'pintura') {
     if (estado === 'EN_PINTURA') {
-      acciones.push({ label: 'Marcar como terminado', estado_nuevo: 'CONTROL_CALIDAD', color: 'btn-primary', descripcion: 'Pintura completada — pasa a control de calidad' })
-      acciones.push({ label: 'Enviar a pulido (faros)', estado_nuevo: 'EN_PULIDO', color: 'btn-secondary', descripcion: 'Solo para faros' })
+      acciones.push({
+        label: 'Marcar pintura terminada',
+        estado_nuevo: 'CONTROL_CALIDAD',
+        color: 'btn-primary',
+        descripcion: 'Pintura completada — pasa a control de calidad',
+        confirmacion: '¿Confirmas que terminaste la pintura? La pieza pasa a control de calidad.'
+      })
+      if (pieza?.es_faro || pieza?.requiere_pulido) {
+        acciones.push({
+          label: 'Enviar a pulido',
+          estado_nuevo: 'EN_PULIDO',
+          color: 'btn-secondary',
+          descripcion: 'Solo para faros',
+          confirmacion: '¿Confirmas enviar a pulido?'
+        })
+      }
     }
     if (estado === 'EN_PULIDO') {
-      acciones.push({ label: 'Pulido terminado', estado_nuevo: 'CONTROL_CALIDAD', color: 'btn-primary', descripcion: 'Pulido completado — pasa a control de calidad' })
+      acciones.push({
+        label: 'Marcar pulido terminado',
+        estado_nuevo: 'CONTROL_CALIDAD',
+        color: 'btn-primary',
+        descripcion: 'Pulido completado — pasa a control de calidad',
+        confirmacion: '¿Confirmas que terminaste el pulido?'
+      })
     }
   }
 
   return acciones
-}
-
-// Siguiente estado automático según el flujo y servicios requeridos
-export function getSiguienteEstado(pieza: Pieza): PiezaEstado | null {
-  switch (pieza.estado) {
-    case 'REGISTRADO': return 'EN_TRASLADO'
-    case 'EN_TRASLADO': return 'RECIBIDO'
-    case 'RECIBIDO': return 'ASIGNADO'
-    case 'ASIGNADO': return 'EN_REPARACION'
-    case 'EN_REPARACION':
-      return pieza.requiere_pintura ? 'EN_PREPARACION' : 'CONTROL_CALIDAD'
-    case 'EN_PREPARACION': return 'EN_PINTURA'
-    case 'EN_PINTURA':
-      return pieza.requiere_pulido ? 'EN_PULIDO' : 'CONTROL_CALIDAD'
-    case 'EN_PULIDO': return 'CONTROL_CALIDAD'
-    case 'CONTROL_CALIDAD': return 'LISTO_ENTREGA'
-    case 'LISTO_ENTREGA': return 'ENTREGADO'
-    default: return null
-  }
 }
