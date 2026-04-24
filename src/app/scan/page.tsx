@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { QrCode, Search, ArrowRight, Camera, X } from 'lucide-react'
+import { Search, ArrowRight, Camera, X } from 'lucide-react'
 
 export default function ScanPage() {
   const router = useRouter()
@@ -11,19 +11,18 @@ export default function ScanPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [camaraActiva, setCamaraActiva] = useState(false)
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const streamRef = useRef<MediaStream | null>(null)
-  const animFrameRef = useRef<number>(0)
+  const scannerRef = useRef<any>(null)
 
   const buscar = async (qr: string) => {
     if (!qr.trim()) return
     setLoading(true)
     setError('')
-    const supabase = createClient()
 
-    // Si es URL con /scan/UUID → extraer UUID directo
-    if (qr.includes('/scan/')) {
-      const id = qr.split('/scan/').pop()?.split('?')[0]?.split('#')[0]?.trim()
+    const texto = qr.trim()
+
+    // Si es URL con /scan/UUID → extraer UUID
+    if (texto.includes('/scan/')) {
+      const id = texto.split('/scan/').pop()?.split('?')[0]?.split('#')[0]?.trim()
       if (id && id.length > 10) {
         router.push(`/scan/${id}`)
         return
@@ -31,88 +30,85 @@ export default function ScanPage() {
     }
 
     // Buscar por qr_code
+    const supabase = createClient()
     const { data: pieza } = await supabase
       .from('piezas')
       .select('id')
-      .eq('qr_code', qr.trim().toUpperCase())
+      .eq('qr_code', texto.toUpperCase())
       .single()
 
     if (pieza) {
       router.push(`/scan/${pieza.id}`)
     } else {
-      setError(`No se encontró ninguna pieza con el código: ${qr}`)
+      setError(`No se encontró: ${texto}`)
       setLoading(false)
     }
   }
 
   const iniciarCamara = async () => {
     setError('')
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
-      })
-      streamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        await videoRef.current.play()
-      }
-      setCamaraActiva(true)
-      escanearFrames()
-    } catch (err) {
-      setError('No se pudo acceder a la cámara. Verifica los permisos del navegador.')
-    }
+    setCamaraActiva(true)
   }
 
-  const detenerCamara = () => {
-    cancelAnimationFrame(animFrameRef.current)
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop())
-      streamRef.current = null
+  const detenerCamara = async () => {
+    if (scannerRef.current) {
+      try {
+        await scannerRef.current.stop()
+        scannerRef.current.clear()
+      } catch {}
+      scannerRef.current = null
     }
     setCamaraActiva(false)
   }
 
-  const escanearFrames = () => {
-    const video = videoRef.current
-    if (!video || video.readyState < 2) {
-      animFrameRef.current = requestAnimationFrame(escanearFrames)
-      return
-    }
-
-    const canvas = document.createElement('canvas')
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-    ctx.drawImage(video, 0, 0)
-
-    // Usar BarcodeDetector si está disponible (Chrome Android)
-    if ('BarcodeDetector' in window) {
-      const detector = new (window as any).BarcodeDetector({ formats: ['qr_code'] })
-      detector.detect(canvas).then((barcodes: any[]) => {
-        if (barcodes.length > 0) {
-          detenerCamara()
-          buscar(barcodes[0].rawValue)
-        } else {
-          animFrameRef.current = requestAnimationFrame(escanearFrames)
-        }
-      }).catch(() => {
-        animFrameRef.current = requestAnimationFrame(escanearFrames)
-      })
-    } else {
-      setError('Tu navegador no soporta escaneo QR. Usa Chrome o ingresa el código manualmente.')
-      detenerCamara()
-    }
-  }
-
   useEffect(() => {
-    return () => {
-      cancelAnimationFrame(animFrameRef.current)
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop())
+    if (!camaraActiva) return
+
+    let mounted = true
+
+    const startScanner = async () => {
+      try {
+        const { Html5QrcodeScanner } = await import('html5-qrcode')
+
+        if (!mounted) return
+
+        const scanner = new Html5QrcodeScanner(
+          'html5-qrcode-container',
+          {
+            fps: 10,
+            qrbox: 250,
+            rememberLastUsedCamera: true,
+            supportedScanTypes: [0], // solo cámara
+          },
+          false
+        )
+
+        scannerRef.current = scanner
+
+        scanner.render(
+          (decodedText: string) => {
+            if (!mounted) return
+            detenerCamara()
+            buscar(decodedText)
+          },
+          () => {} // errores de frame silenciosos
+        )
+      } catch (err) {
+        setError('No se pudo iniciar la cámara.')
+        setCamaraActiva(false)
       }
     }
-  }, [])
+
+    startScanner()
+
+    return () => {
+      mounted = false
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch(() => {})
+        scannerRef.current = null
+      }
+    }
+  }, [camaraActiva])
 
   return (
     <div className="max-w-md mx-auto space-y-5">
@@ -121,25 +117,15 @@ export default function ScanPage() {
         <p className="text-sm text-[#475569] mt-0.5">Busca una pieza por su código</p>
       </div>
 
-      {/* Visor de cámara */}
+      {/* Scanner */}
       {camaraActiva && (
-        <div className="card overflow-hidden relative">
-          <video ref={videoRef} className="w-full" playsInline muted autoPlay />
-          {/* Marco de escaneo */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-56 h-56 relative">
-              <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-[#00D4FF] rounded-tl-lg" />
-              <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-[#00D4FF] rounded-tr-lg" />
-              <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-[#00D4FF] rounded-bl-lg" />
-              <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-[#00D4FF] rounded-br-lg" />
-            </div>
-          </div>
-          <button onClick={detenerCamara}
-            className="absolute top-3 right-3 w-10 h-10 bg-black/60 rounded-full flex items-center justify-center text-white z-10">
-            <X size={20} />
-          </button>
-          <div className="p-3 text-center bg-black/40">
-            <p className="text-xs text-white">Apunta al código QR de la pieza</p>
+        <div className="card overflow-hidden">
+          <div className="relative">
+            <div id="html5-qrcode-container" className="w-full" />
+            <button onClick={detenerCamara}
+              className="absolute top-3 right-3 w-10 h-10 bg-black/70 rounded-full flex items-center justify-center text-white z-50">
+              <X size={20} />
+            </button>
           </div>
         </div>
       )}
@@ -147,7 +133,7 @@ export default function ScanPage() {
       {/* Botón abrir cámara */}
       {!camaraActiva && (
         <button onClick={iniciarCamara} disabled={loading}
-          className="w-full flex items-center justify-center gap-4 py-8 bg-[#00D4FF]/10 hover:bg-[#00D4FF]/20 border-2 border-dashed border-[#00D4FF]/30 hover:border-[#00D4FF]/60 rounded-2xl transition-all active:scale-[0.98] disabled:opacity-50">
+          className="w-full flex items-center justify-center gap-4 py-8 bg-[#00D4FF]/10 hover:bg-[#00D4FF]/20 border-2 border-dashed border-[#00D4FF]/30 rounded-2xl transition-all active:scale-[0.98]">
           <div className="w-14 h-14 rounded-2xl bg-[#00D4FF]/20 flex items-center justify-center">
             <Camera size={30} className="text-[#00D4FF]" />
           </div>
