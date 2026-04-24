@@ -66,26 +66,26 @@ export default function ScanPage() {
             scanner.stop().catch(() => {})
             setCamaraActiva(false)
 
-            // Si es URL interna con /scan/ID → navegar directo
-            if (decodedText.includes('/scan/')) {
-              const parts = decodedText.split('/scan/')
-              const id = parts[parts.length - 1].split('?')[0].trim()
-              if (id && id.length > 10) {
-                router.push(`/scan/${id}`)
-                return
+            const texto = decodedText.trim()
+            console.log('QR detectado:', texto)
+
+            try {
+              // Si es URL interna con /scan/ID → navegar directo
+              if (texto.includes('/scan/')) {
+                const parts = texto.split('/scan/')
+                const id = parts[parts.length - 1].split('?')[0].split('#')[0].trim()
+                console.log('ID extraído:', id)
+                if (id && id.length > 10) {
+                  router.push('/scan/' + id)
+                  return
+                }
               }
+              // Si es código QR directo (QR-XXXXXXXX)
+              buscar(texto)
+            } catch (err) {
+              console.error('Error procesando QR:', err)
+              setError('Error al procesar el código QR. Intenta de nuevo.')
             }
-            // Si es URL con /estado/ID → también navegar
-            if (decodedText.includes('/estado/')) {
-              const parts = decodedText.split('/estado/')
-              const id = parts[parts.length - 1].split('?')[0].trim()
-              if (id && id.length > 10) {
-                router.push(`/scan/${id}`)
-                return
-              }
-            }
-            // Si es código QR directo (QR-XXXXXXXX)
-            buscar(decodedText.trim())
           },
           () => {} // error silencioso por frames sin QR
         )
