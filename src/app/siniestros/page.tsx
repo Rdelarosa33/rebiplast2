@@ -127,7 +127,7 @@ export default async function SiniestrosPage({ searchParams }: { searchParams: P
         {siniestros.map(s => {
           const total = s.piezas?.length || 0
           const listo = s.piezas?.filter((p: any) => ['LISTO_ENTREGA','ENTREGADO'].includes(p.estado)).length || 0
-          const estadosUnicos = [...new Set(s.piezas?.map((p: any) => p.estado))] as PiezaEstado[]
+          const estadosUnicos = Array.from(new Set(s.piezas?.map((p: any) => p.estado))) as PiezaEstado[]
 
           return (
             <Link key={s.id} href={`/siniestros/${s.id}`}
