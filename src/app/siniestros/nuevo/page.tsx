@@ -27,16 +27,6 @@ const PIEZA_VACIA: PiezaForm = {
 
 const LADOS = ['N/A', 'Izquierdo', 'Derecho', 'Frontal', 'Posterior']
 
-const GIRADOR_LABEL: Record<string, string> = {
-  PACIFICO: 'Nombre Usuario',
-  RIMAC: 'Técnico',
-  MAPFRE: 'Perito',
-  LA_POSITIVA: 'Ajustador',
-  HDI: 'Ajustador',
-  INTERSEGURO: 'Ajustador',
-  TALLER: 'Responsable',
-  OTRO: 'Girador',
-}
 
 export default function NuevoSiniestroPage() {
   const router = useRouter()
@@ -320,10 +310,10 @@ export default function NuevoSiniestroPage() {
             <h2 className="font-syne font-semibold text-white">Seguro</h2>
             <div className="grid grid-cols-2 gap-3">
               <div><label className="label">Compañía *</label>
-                <select className="input-field" value={form.tipo_seguro} onChange={e => setForm({...form, tipo_seguro: e.target.value})}>
+                <select className="input-field" value={form.tipo_seguro} onChange={e => setForm({...form, tipo_seguro: e.target.value, nombre_girador: e.target.value === 'INTERSEGURO' ? 'José Fernández' : form.nombre_girador})}>
                   {SEGUROS.map(s => <option key={s} value={s}>{s}</option>)}
                 </select></div>
-              <div><label className="label">{GIRADOR_LABEL[form.tipo_seguro] || 'Girador'}</label>
+              <div><label className="label">Girador</label>
                 <input className="input-field" value={form.nombre_girador} onChange={e => setForm({...form, nombre_girador: e.target.value})} /></div>
             </div>
             <details className="group">
