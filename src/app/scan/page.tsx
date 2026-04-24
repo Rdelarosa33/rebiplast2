@@ -100,18 +100,8 @@ export default function ScanPage() {
         animFrameRef.current = requestAnimationFrame(escanearFrames)
       })
     } else {
-      // Fallback: usar html5-qrcode para decodificar
-      import('html5-qrcode').then(({ Html5Qrcode }) => {
-        Html5Qrcode.scanFile(
-          new File([canvas.toDataURL()], 'frame.png'),
-          true
-        ).then((result: string) => {
-          detenerCamara()
-          buscar(result)
-        }).catch(() => {
-          animFrameRef.current = requestAnimationFrame(escanearFrames)
-        })
-      })
+      setError('Tu navegador no soporta escaneo QR. Usa Chrome o ingresa el código manualmente.')
+      detenerCamara()
     }
   }
 
@@ -202,4 +192,3 @@ export default function ScanPage() {
     </div>
   )
 }
-// updated
