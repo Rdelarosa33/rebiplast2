@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient as createServerClient } from '@supabase/supabase-js'
 import { notFound } from 'next/navigation'
 import { ESTADO_LABELS, ESTADO_COLOR, PiezaEstado } from '@/types'
 import { CheckCircle, Clock, Package, Wrench, Paintbrush, Sparkles, ShieldCheck, Truck } from 'lucide-react'
@@ -7,7 +7,10 @@ export const revalidate = 60 // revalidar cada 60 segundos
 
 export default async function EstadoPublicoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const supabase = await createClient()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 
   const { data: siniestro } = await supabase
     .from('siniestros')
