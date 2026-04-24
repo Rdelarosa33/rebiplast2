@@ -130,11 +130,6 @@ import Anthropic from '@anthropic-ai/sdk'
 // ================================================
 // CONFIGURACIÓN: elige qué proveedor usar
 // ================================================
-const USE_GOOGLE_VISION = true
-const USE_CLAUDE = false
-const USE_OPENAI = false
-// ================================================
-
 
 
 async function procesarConOpenAI(base64: string, mediaType: string) {
