@@ -24,51 +24,48 @@ MAPEO DE CAMPOS POR SEGURO
 RIMAC — hay DOS formatos:
 Formato 1 (Orden de compra simple):
   - N° Siniestro: campo "Siniestro N°"
-  - N° Orden: campo "N°" al inicio del documento (ej: 60349)
+  - N° Orden: campo "N°" al inicio del documento
   - Póliza: campo "Póliza N°"
   - Placa: campo "Rodaje"
   - Marca/Modelo/Año: en tabla de datos del vehículo
-  - Girador (Técnico): firma del documento, busca "TÉCNICO SINIESTROS" o similar al pie
+  - Girador: busca "TÉCNICO SINIESTROS" o similar al pie
 Formato 2 (Detalle de aprobación):
   - N° Orden: campo "NRO DE OC"
   - N° Siniestro: campo "SINIESTRO"
   - Póliza: campo "PÓLIZA"
   - Placa: campo "PLACA"
-  - Marca/Modelo/Año: en la misma línea que PLACA
-  - Girador (Técnico): campo "TÉCNICO" al pie del documento
+  - Girador: campo "TÉCNICO" al pie del documento
 
 MAPFRE (Orden de Trabajo):
-  - N° Orden: el número grande después de "ORDEN DE TRABAJO" (ej: 202602030602)
-  - N° Siniestro: campo "SINIESTRO:" en datos del siniestro
-  - Expediente: campo "EXPEDIENTE:" (ej: 1-PPD)
+  - N° Orden: el número grande después de "ORDEN DE TRABAJO"
+  - N° Siniestro: campo "SINIESTRO:"
+  - Expediente: campo "EXPEDIENTE:"
   - Póliza: campo "POLIZA:"
-  - Placa: campo "PLACA:" en datos del vehículo
-  - Marca/Modelo/Año: en tabla datos del vehículo
+  - Placa: campo "PLACA:"
   - VIN: campo "CHASIS:"
-  - Girador (Perito): campo "Perito:" al pie del documento
+  - Girador: campo "Perito:" al pie del documento
   - Piezas: en tabla "DESCRIPCIÓN Y EVALUACIÓN DE DAÑOS", filas con prefijo REP
 
 PACIFICO:
-  - N° Orden: campo "Folio:" (ej: 20260413-1737000_01)
+  - N° Orden: campo "Folio:"
   - N° Siniestro: campo "Siniestro:"
   - Póliza: campo "Poliza:"
   - VIN: campo "VIN:"
   - Placa: campo "Placa:"
-  - Marca/Fabricante: campo "Fabricante:"
+  - Marca: campo "Fabricante:"
   - Modelo: campo "Modelo:"
   - Año: campo "Año Vehículo:"
-  - Girador (Nombre Usuario): campo "Nombre Usuario:"
-  - Piezas: en tabla con columnas DESCRIPCION/REFERENCIA/IMPORTE, busca filas numeradas (1., 2.) en columna DESCRIPCION, IGNORAR columnas REFERENCIA e IMPORTE
+  - Girador: campo "Nombre Usuario:"
+  - Piezas: filas numeradas (1., 2.) en columna DESCRIPCION, IGNORAR columnas REFERENCIA e IMPORTE
 
 LA_POSITIVA (Orden de Compra):
-  - N° Orden: campo "N° OC-" al inicio
+  - N° Orden: campo "N° OC-"
   - N° Siniestro: campo "Siniestro:"
   - Póliza: campo "Póliza:"
   - Placa: campo "Placa:"
-  - Marca/Modelo/Año: en la misma línea que Placa
   - VIN: campo "N° Serie:"
-  - Girador (Técnico): campo "Técnico de Vehículos:" al pie, o la firma
-  - Piezas: en tabla "Cambio/Reparacion por" + "Descripción", busca la descripción del servicio
+  - Girador: campo "Técnico de Vehículos:" al pie
+  - Piezas: en tabla "Cambio/Reparacion por" + "Descripción"
 
 INTERSEGURO:
   - Girador: siempre "José Fernández" sin buscar en el documento
@@ -77,18 +74,16 @@ INTERSEGURO:
 REGLAS PARA PIEZAS
 ========================
 - Cada línea o fila con una pieza = un objeto separado
-- "REPARA", "REPARAR", "REP", "REPARACION DE" al inicio = requiere_reparacion true, tipo_trabajo "R"
-- "REPARACION Y PINTURA", "RP" = requiere_reparacion true, requiere_pintura true, tipo_trabajo "RP"
-- Si dice "PINTURA" o "+ Pintura" en la descripción = requiere_pintura true, tipo_trabajo "RP"
+- "REPARA", "REPARAR", "REP", "REPARACION DE" = requiere_reparacion true, tipo_trabajo "R"
+- "REPARACION Y PINTURA", "RP", "+ Pintura" = requiere_reparacion true, requiere_pintura true, tipo_trabajo "RP"
 - LH = lado Izquierdo, RH = lado Derecho, DELT = Frontal, POST = Posterior
-- FARO, NEBLINERO = es_faro true, requiere_pulido true si también tiene pintura
-- IGNORAR filas vacías, subtotales, IGV, totales, deducibles
+- FARO, NEBLINERO = es_faro true
+- IGNORAR filas vacías, subtotales, IGV, totales
 
 ========================
 REGLAS GENERALES
 ========================
-- La PLACA es crítica — búscala aunque esté en campos con nombres diferentes (Rodaje, Placa, etc.)
-- Si un campo tiene nombre diferente pero claramente contiene el dato, úsalo
+- La PLACA es crítica — búscala aunque esté en campo "Rodaje" u otro nombre
 - No inventes datos — si no lo ves claramente, usa null
 
 Devuelve SOLO este JSON sin markdown:
@@ -125,59 +120,6 @@ Devuelve SOLO este JSON sin markdown:
   ]
 }`
 
-import Anthropic from '@anthropic-ai/sdk'
-
-// ================================================
-// CONFIGURACIÓN: elige qué proveedor usar
-// ================================================
-
-
-async function procesarConOpenAI(base64: string, mediaType: string) {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) throw new Error('OPENAI_API_KEY no configurada')
-
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o',
-      max_tokens: 2000,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image_url', image_url: { url: `data:${mediaType};base64,${base64}`, detail: 'high' } },
-          { type: 'text', text: PROMPT }
-        ]
-      }]
-    })
-  })
-
-  const data = await res.json()
-  if (data.error) throw new Error(data.error.message)
-  const text = data.choices?.[0]?.message?.content || ''
-  return text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-}
-
-async function procesarConClaude(base64: string, mediaType: string) {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 2000,
-    messages: [{
-      role: 'user',
-      content: [
-        { type: 'image', source: { type: 'base64', media_type: mediaType as any, data: base64 } },
-        { type: 'text', text: PROMPT }
-      ]
-    }]
-  })
-  const text = response.content[0].type === 'text' ? response.content[0].text : ''
-  return text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-}
-
 async function procesarConGoogleVision(base64: string) {
   const apiKey = process.env.GOOGLE_VISION_API_KEY
   if (!apiKey) throw new Error('GOOGLE_VISION_API_KEY no configurada')
@@ -201,9 +143,50 @@ async function procesarConGoogleVision(base64: string) {
   const response = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 2000,
-    messages: [{ role: 'user', content: `${PROMPT}\n\nTexto extraído:\n\n${textoExtraido}` }]
+    messages: [{ role: 'user', content: `${PROMPT}\n\nTexto extraído de la orden:\n\n${textoExtraido}` }]
   })
   const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  return text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+}
+
+async function procesarConClaude(base64: string, mediaType: string) {
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const response = await client.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 2000,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'image', source: { type: 'base64', media_type: mediaType as any, data: base64 } },
+        { type: 'text', text: PROMPT }
+      ]
+    }]
+  })
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  return text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+}
+
+async function procesarConOpenAI(base64: string, mediaType: string) {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) throw new Error('OPENAI_API_KEY no configurada')
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: 'gpt-4o',
+      max_tokens: 2000,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: `data:${mediaType};base64,${base64}`, detail: 'high' } },
+          { type: 'text', text: PROMPT }
+        ]
+      }]
+    })
+  })
+  const data = await res.json()
+  if (data.error) throw new Error(data.error.message)
+  const text = data.choices?.[0]?.message?.content || ''
   return text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
 }
 
@@ -220,12 +203,12 @@ export async function POST(request: NextRequest) {
     let jsonText = ''
     let proveedor = ''
 
-    if (USE_OPENAI) {
-      jsonText = await procesarConOpenAI(base64, mediaType)
-      proveedor = 'openai'
-    } else if (USE_GOOGLE_VISION) {
+    if (USE_GOOGLE_VISION) {
       jsonText = await procesarConGoogleVision(base64)
       proveedor = 'google'
+    } else if (USE_OPENAI) {
+      jsonText = await procesarConOpenAI(base64, mediaType)
+      proveedor = 'openai'
     } else if (USE_CLAUDE) {
       jsonText = await procesarConClaude(base64, mediaType)
       proveedor = 'claude'
@@ -234,7 +217,6 @@ export async function POST(request: NextRequest) {
     }
 
     const data = JSON.parse(jsonText)
-
     return NextResponse.json({ success: true, data, proveedor })
 
   } catch (error: any) {
