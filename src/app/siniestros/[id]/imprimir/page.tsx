@@ -98,40 +98,28 @@ export default function ImprimirEtiquetasPage() {
       <div ref={printRef} className="print-container pt-16">
         {siniestro.piezas?.map((pieza, i) => (
           <div key={pieza.id} className="etiqueta">
-            {/* QR grande */}
+            {/* QR */}
             {qrImages[pieza.id] && (
               <img src={qrImages[pieza.id]} alt={`QR ${pieza.qr_code}`} className="qr-img" />
             )}
 
-            {/* Código QR */}
-            <p className="qr-code">{pieza.qr_code}</p>
-
-            {/* Nombre de la pieza */}
-            <p className="pieza-nombre">{pieza.nombre}</p>
-
-            {/* Lado */}
-            {pieza.lado && pieza.lado !== 'N/A' && (
-              <p className="pieza-detalle">{pieza.lado}</p>
-            )}
-
-            {/* Servicios */}
-            <div className="servicios">
-              {pieza.requiere_reparacion && <span>REP</span>}
-              {pieza.requiere_pintura && <span>PIN</span>}
-              {pieza.requiere_pulido && <span>PUL</span>}
+            {/* Texto */}
+            <div className="texto-container">
+              <p className="pieza-nombre">{pieza.nombre}</p>
+              {pieza.lado && pieza.lado !== 'N/A' && (
+                <p className="pieza-detalle">{pieza.lado}</p>
+              )}
+              <div className="servicios">
+                {pieza.requiere_reparacion && <span>REP</span>}
+                {pieza.requiere_pintura && <span>PIN</span>}
+                {pieza.requiere_pulido && <span>PUL</span>}
+              </div>
+              <div className="separador" />
+              <p className="sin-numero">{siniestro.numero_siniestro}</p>
+              <p className="sin-detalle">{siniestro.placa} · {siniestro.marca}</p>
+              <p className="sin-taller">{siniestro.taller_origen}</p>
+              <p className="pieza-num">{i + 1}/{siniestro.piezas.length}</p>
             </div>
-
-            {/* Separador */}
-            <div className="separador" />
-
-            {/* Datos del siniestro */}
-            <p className="sin-numero">{siniestro.numero_siniestro}</p>
-            <p className="sin-detalle">{siniestro.placa} · {siniestro.marca}</p>
-            <p className="sin-detalle">{siniestro.tipo_seguro}</p>
-            <p className="sin-taller">{siniestro.taller_origen}</p>
-
-            {/* Número de pieza */}
-            <p className="pieza-num">{i + 1}/{siniestro.piezas.length}</p>
           </div>
         ))}
       </div>
@@ -150,19 +138,22 @@ export default function ImprimirEtiquetasPage() {
             background: white;
             border: 1px solid #ddd;
             border-radius: 8px;
-            padding: 12px;
-            width: 220px;
+            padding: 8px;
+            width: 215px;
+            height: 150px;
             display: flex;
-            flex-direction: column;
+            flex-direction: row;
             align-items: center;
+            gap: 8px;
             font-family: monospace;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow: hidden;
           }
         }
 
         @media print {
           @page {
-            size: 58mm auto;
+            size: 57mm 40mm;
             margin: 0;
           }
           * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -173,14 +164,17 @@ export default function ImprimirEtiquetasPage() {
             padding: 0;
           }
           .etiqueta {
-            width: 54mm;
-            padding: 2mm;
+            width: 57mm;
+            height: 40mm;
+            padding: 1mm 2mm;
             margin: 0 auto;
             page-break-after: always;
             display: flex;
-            flex-direction: column;
+            flex-direction: row;
             align-items: center;
+            gap: 2mm;
             font-family: monospace;
+            overflow: hidden;
           }
           .etiqueta:last-child {
             page-break-after: avoid;
@@ -188,26 +182,26 @@ export default function ImprimirEtiquetasPage() {
         }
 
         .qr-img {
-          width: 160px;
-          height: 160px;
+          width: 30mm;
+          height: 30mm;
           display: block;
-          margin: 0 auto 4px;
+          flex-shrink: 0;
         }
 
         .qr-code {
-          font-size: 9px;
+          font-size: 7px;
           font-family: monospace;
           color: #666;
-          margin: 0 0 4px;
-          text-align: center;
+          margin: 0 0 2px;
+          text-align: left;
           letter-spacing: 0.5px;
         }
 
         .pieza-nombre {
-          font-size: 14px;
+          font-size: 11px;
           font-weight: 900;
-          text-align: center;
-          margin: 4px 0 2px;
+          text-align: left;
+          margin: 0 0 2px;
           font-family: sans-serif;
           line-height: 1.2;
           text-transform: uppercase;
@@ -215,8 +209,8 @@ export default function ImprimirEtiquetasPage() {
         }
 
         .pieza-detalle {
-          font-size: 11px;
-          text-align: center;
+          font-size: 9px;
+          text-align: left;
           color: #444;
           margin: 1px 0;
           font-family: sans-serif;
@@ -224,57 +218,65 @@ export default function ImprimirEtiquetasPage() {
 
         .servicios {
           display: flex;
-          gap: 4px;
-          margin: 4px 0;
-          justify-content: center;
+          gap: 2px;
+          margin: 2px 0;
+          justify-content: flex-start;
         }
 
         .servicios span {
-          font-size: 12px;
+          font-size: 9px;
           font-weight: 900;
           font-family: monospace;
-          border: 2px solid #000;
-          padding: 2px 6px;
-          border-radius: 3px;
+          border: 1.5px solid #000;
+          padding: 1px 3px;
+          border-radius: 2px;
           color: #000000;
         }
 
         .separador {
           width: 100%;
           border-top: 1px dashed #999;
-          margin: 6px 0;
-        }
-
-        .sin-numero {
-          font-size: 10px;
-          font-family: monospace;
-          font-weight: bold;
-          text-align: center;
           margin: 2px 0;
         }
 
+        .sin-numero {
+          font-size: 8px;
+          font-family: monospace;
+          font-weight: bold;
+          text-align: left;
+          margin: 2px 0 1px;
+        }
+
         .sin-detalle {
-          font-size: 9px;
+          font-size: 8px;
           font-family: sans-serif;
-          text-align: center;
+          text-align: left;
           color: #555;
-          margin: 1px 0;
+          margin: 0;
         }
 
         .sin-taller {
-          font-size: 8px;
+          font-size: 7px;
           font-family: sans-serif;
-          text-align: center;
+          text-align: left;
           color: #777;
-          margin: 1px 0;
+          margin: 0;
         }
 
         .pieza-num {
-          font-size: 9px;
+          font-size: 7px;
           font-family: monospace;
           color: #999;
-          margin-top: 4px;
-          text-align: center;
+          margin-top: 2px;
+          text-align: left;
+        }
+
+        .texto-container {
+          flex: 1;
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
         }
       `}</style>
     </>
