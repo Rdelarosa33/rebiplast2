@@ -126,7 +126,7 @@ export default function NuevoSiniestroPage() {
         tipo_seguro: d.tipo_seguro || prev.tipo_seguro,
         nombre_girador: d.nombre_girador || prev.nombre_girador,
         taller_origen: d.taller_origen || prev.taller_origen,
-        fecha_recojo: d.fecha_recojo || prev.fecha_recojo,
+        fecha_recojo: prev.fecha_recojo, // siempre la fecha real de recojo, no la de la orden
         observaciones: d.observaciones || prev.observaciones,
       }))
 

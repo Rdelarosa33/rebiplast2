@@ -205,7 +205,7 @@ export default function ScanPiezaPage({ params }: { params: { id: string } }) {
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium text-white">{h.accion}</span>
                     <span className="text-xs text-[#475569]">
-                      {new Date(h.created_at).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      {new Date(h.created_at).toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
                   {h.estado_nuevo && (

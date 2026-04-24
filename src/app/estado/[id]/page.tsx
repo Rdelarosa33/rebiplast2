@@ -173,8 +173,9 @@ export default async function EstadoPublicoPage({ params }: { params: Promise<{ 
                             )}
                           </div>
                           <span className="text-[#475569]">
-                            {new Date(h.created_at).toLocaleDateString('es-PE', {
-                              day: '2-digit', month: '2-digit', year: '2-digit'
+                            {new Date(h.created_at).toLocaleString('es-PE', {
+                              day: '2-digit', month: '2-digit', year: '2-digit',
+                              hour: '2-digit', minute: '2-digit'
                             })}
                           </span>
                         </div>
