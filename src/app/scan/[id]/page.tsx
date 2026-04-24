@@ -22,15 +22,17 @@ export default function ScanPiezaPage({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     const supabase = createClient()
-    Promise.all([
-      supabase.from('piezas').select('*, siniestro:siniestros(*), historial:historial_piezas(*)').eq('id', id).single(),
-      supabase.auth.getUser().then(({ data: { user } }) =>
-        user ? supabase.from('profiles').select('*').eq('id', user.id).single() : { data: null }
-      )
-    ]).then(([{ data: p }, { data: pr }]) => {
-      setPieza(p)
-      setProfile(pr)
-      setLoading(false)
+    supabase.from('piezas').select('*, siniestro:siniestros(*), historial:historial_piezas(*)').eq('id', id).single()
+      .then(({ data: p }) => {
+        setPieza(p)
+      })
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) { setLoading(false); return }
+      supabase.from('profiles').select('*').eq('id', user.id).single()
+        .then(({ data: pr }) => {
+          setProfile(pr)
+          setLoading(false)
+        })
     })
   }, [id])
 
