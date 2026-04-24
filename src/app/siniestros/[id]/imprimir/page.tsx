@@ -204,13 +204,14 @@ export default function ImprimirEtiquetasPage() {
         }
 
         .pieza-nombre {
-          font-size: 13px;
-          font-weight: bold;
+          font-size: 14px;
+          font-weight: 900;
           text-align: center;
           margin: 4px 0 2px;
           font-family: sans-serif;
           line-height: 1.2;
           text-transform: uppercase;
+          color: #000000;
         }
 
         .pieza-detalle {
