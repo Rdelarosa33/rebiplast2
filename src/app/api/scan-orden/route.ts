@@ -123,7 +123,8 @@ Devuelve SOLO este JSON sin markdown:
       "precio": null
     }
   ]
-}`er'
+}`
+
 import Anthropic from '@anthropic-ai/sdk'
 
 // ================================================
