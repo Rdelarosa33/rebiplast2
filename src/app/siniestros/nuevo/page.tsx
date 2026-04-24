@@ -27,6 +27,17 @@ const PIEZA_VACIA: PiezaForm = {
 
 const LADOS = ['N/A', 'Izquierdo', 'Derecho', 'Frontal', 'Posterior']
 
+const GIRADOR_LABEL: Record<string, string> = {
+  PACIFICO: 'Nombre Usuario',
+  RIMAC: 'Técnico',
+  MAPFRE: 'Perito',
+  LA_POSITIVA: 'Ajustador',
+  HDI: 'Ajustador',
+  INTERSEGURO: 'Ajustador',
+  TALLER: 'Responsable',
+  OTRO: 'Girador',
+}
+
 export default function NuevoSiniestroPage() {
   const router = useRouter()
   const [step, setStep] = useState(1) // 1=datos, 2=piezas, 3=confirmacion
@@ -312,7 +323,7 @@ export default function NuevoSiniestroPage() {
                 <select className="input-field" value={form.tipo_seguro} onChange={e => setForm({...form, tipo_seguro: e.target.value})}>
                   {SEGUROS.map(s => <option key={s} value={s}>{s}</option>)}
                 </select></div>
-              <div><label className="label">Girador</label>
+              <div><label className="label">{GIRADOR_LABEL[form.tipo_seguro] || 'Girador'}</label>
                 <input className="input-field" value={form.nombre_girador} onChange={e => setForm({...form, nombre_girador: e.target.value})} /></div>
             </div>
             <details className="group">
