@@ -167,9 +167,11 @@ export default function ScanPiezaPage({ params }: { params: { id: string } }) {
             <div className="space-y-2">
               {acciones.map((accion, i) => (
                 <button key={i} disabled={accionLoading}
-                  onClick={() => setModal(accion)}
+                  onClick={() => accion.requiere_motivo ? setModal(accion) : ejecutarAccion(accion)}
                   className={`${accion.color} w-full justify-center disabled:opacity-50`}>
-                  {accion.label}
+                  {accionLoading
+                    ? <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin mx-auto" />
+                    : accion.label}
                 </button>
               ))}
             </div>
