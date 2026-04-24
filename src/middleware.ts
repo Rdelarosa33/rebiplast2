@@ -29,6 +29,11 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse
   }
 
+  // Rutas públicas — sin login requerido
+  if (pathname.startsWith('/estado/')) {
+    return supabaseResponse
+  }
+
   if (!user && pathname !== '/') {
     return NextResponse.redirect(new URL('/login', request.url))
   }
