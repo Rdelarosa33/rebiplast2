@@ -10,6 +10,131 @@ const USE_OPENAI = false
 // ================================================
 
 const PROMPT = `Eres un experto en leer órdenes de trabajo de talleres automotrices peruanos.
+Analiza esta imagen y extrae los datos según el formato del documento.
+
+========================
+IDENTIFICAR FORMATO
+========================
+Detecta el logo o nombre del seguro: RIMAC, MAPFRE, PACIFICO, LA_POSITIVA, HDI, INTERSEGURO, TALLER
+
+========================
+MAPEO DE CAMPOS POR SEGURO
+========================
+
+RIMAC — hay DOS formatos:
+Formato 1 (Orden de compra simple):
+  - N° Siniestro: campo "Siniestro N°"
+  - N° Orden: campo "N°" al inicio del documento (ej: 60349)
+  - Póliza: campo "Póliza N°"
+  - Placa: campo "Rodaje"
+  - Marca/Modelo/Año: en tabla de datos del vehículo
+  - Girador (Técnico): firma del documento, busca "TÉCNICO SINIESTROS" o similar al pie
+Formato 2 (Detalle de aprobación):
+  - N° Orden: campo "NRO DE OC"
+  - N° Siniestro: campo "SINIESTRO"
+  - Póliza: campo "PÓLIZA"
+  - Placa: campo "PLACA"
+  - Marca/Modelo/Año: en la misma línea que PLACA
+  - Girador (Técnico): campo "TÉCNICO" al pie del documento
+
+MAPFRE (Orden de Trabajo):
+  - N° Orden: el número grande después de "ORDEN DE TRABAJO" (ej: 202602030602)
+  - N° Siniestro: campo "SINIESTRO:" en datos del siniestro
+  - Expediente: campo "EXPEDIENTE:" (ej: 1-PPD)
+  - Póliza: campo "POLIZA:"
+  - Placa: campo "PLACA:" en datos del vehículo
+  - Marca/Modelo/Año: en tabla datos del vehículo
+  - VIN: campo "CHASIS:"
+  - Girador (Perito): campo "Perito:" al pie del documento
+  - Piezas: en tabla "DESCRIPCIÓN Y EVALUACIÓN DE DAÑOS", filas con prefijo REP
+
+PACIFICO:
+  - N° Orden: campo "Folio:" (ej: 20260413-1737000_01)
+  - N° Siniestro: campo "Siniestro:"
+  - Póliza: campo "Poliza:"
+  - VIN: campo "VIN:"
+  - Placa: campo "Placa:"
+  - Marca/Fabricante: campo "Fabricante:"
+  - Modelo: campo "Modelo:"
+  - Año: campo "Año Vehículo:"
+  - Girador (Nombre Usuario): campo "Nombre Usuario:"
+  - Piezas: en tabla con columnas DESCRIPCION/REFERENCIA/IMPORTE, busca filas numeradas (1., 2.) en columna DESCRIPCION, IGNORAR columnas REFERENCIA e IMPORTE
+
+LA_POSITIVA (Orden de Compra):
+  - N° Orden: campo "N° OC-" al inicio
+  - N° Siniestro: campo "Siniestro:"
+  - Póliza: campo "Póliza:"
+  - Placa: campo "Placa:"
+  - Marca/Modelo/Año: en la misma línea que Placa
+  - VIN: campo "N° Serie:"
+  - Girador (Técnico): campo "Técnico de Vehículos:" al pie, o la firma
+  - Piezas: en tabla "Cambio/Reparacion por" + "Descripción", busca la descripción del servicio
+
+INTERSEGURO:
+  - Girador: siempre "José Fernández" sin buscar en el documento
+
+========================
+REGLAS PARA PIEZAS
+========================
+- Cada línea o fila con una pieza = un objeto separado
+- "REPARA", "REPARAR", "REP", "REPARACION DE" al inicio = requiere_reparacion true, tipo_trabajo "R"
+- "REPARACION Y PINTURA", "RP" = requiere_reparacion true, requiere_pintura true, tipo_trabajo "RP"
+- Si dice "PINTURA" o "+ Pintura" en la descripción = requiere_pintura true, tipo_trabajo "RP"
+- LH = lado Izquierdo, RH = lado Derecho, DELT = Frontal, POST = Posterior
+- FARO, NEBLINERO = es_faro true, requiere_pulido true si también tiene pintura
+- IGNORAR filas vacías, subtotales, IGV, totales, deducibles
+
+========================
+REGLAS GENERALES
+========================
+- La PLACA es crítica — búscala aunque esté en campos con nombres diferentes (Rodaje, Placa, etc.)
+- Si un campo tiene nombre diferente pero claramente contiene el dato, úsalo
+- No inventes datos — si no lo ves claramente, usa null
+
+Devuelve SOLO este JSON sin markdown:
+{
+  "numero_siniestro": null,
+  "numero_orden": null,
+  "expediente": null,
+  "poliza": null,
+  "placa": null,
+  "marca": null,
+  "modelo": null,
+  "anio": null,
+  "color": null,
+  "vin": null,
+  "nombre_asegurado": null,
+  "telefono_asegurado": null,
+  "tipo_seguro": "RIMAC|PACIFICO|MAPFRE|LA_POSITIVA|HDI|INTERSEGURO|TALLER|OTRO",
+  "nombre_girador": null,
+  "taller_origen": null,
+  "fecha_recojo": null,
+  "observaciones": null,
+  "piezas": [
+    {
+      "nombre": "nombre de la pieza",
+      "lado": "Izquierdo|Derecho|Frontal|Posterior|N/A",
+      "color": null,
+      "requiere_reparacion": true,
+      "requiere_pintura": false,
+      "es_faro": false,
+      "requiere_pulido": false,
+      "tipo_trabajo": "R|RP",
+      "precio": null
+    }
+  ]
+}`er'
+import Anthropic from '@anthropic-ai/sdk'
+
+// ================================================
+// CONFIGURACIÓN: elige qué proveedor usar
+// ================================================
+const USE_GOOGLE_VISION = true
+const USE_CLAUDE = false
+const USE_OPENAI = false
+// ================================================
+
+const PROMPT = `Eres un experto en leer órdenes de trabajo de talleres automotrices peruanos.
 Analiza esta imagen de una orden de trabajo y extrae los datos del vehículo y las piezas a reparar.
 
 FORMATOS DE ORDEN QUE PUEDES ENCONTRAR:
