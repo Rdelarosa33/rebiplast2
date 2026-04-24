@@ -19,11 +19,19 @@ export default function ScanPage() {
     setError('')
     const texto = qr.trim()
 
+    // URL interna de pieza: /scan/UUID
     if (texto.includes('/scan/')) {
       const id = texto.split('/scan/').pop()?.split('?')[0]?.split('#')[0]?.trim()
       if (id && id.length > 10) { router.push(`/scan/${id}`); return }
     }
 
+    // URL de estado taller/seguro: /estado/UUID → redirigir al siniestro
+    if (texto.includes('/estado/')) {
+      const id = texto.split('/estado/').pop()?.split('?')[0]?.split('#')[0]?.trim()
+      if (id && id.length > 10) { router.push(`/siniestros/${id}`); return }
+    }
+
+    // Código QR directo: QR-XXXXXXXX
     const supabase = createClient()
     const { data: pieza } = await supabase.from('piezas').select('id').eq('qr_code', texto.toUpperCase()).single()
     if (pieza) {
