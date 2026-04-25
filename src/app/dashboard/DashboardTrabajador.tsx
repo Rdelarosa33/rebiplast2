@@ -11,10 +11,18 @@ export default async function DashboardTrabajador({ profile }: { profile: Profil
 
   const { data: piezas } = await supabase
     .from('piezas')
-    .select('*, siniestro:siniestros(numero_siniestro, placa, taller_origen, tipo_seguro)')
+    .select('*, siniestro:siniestros(numero_siniestro, placa, taller_origen, tipo_seguro), historial:historial_piezas(accion, estado_nuevo, motivo, created_at, usuario_nombre)')
     .in('estado', estados)
     .eq('trabajador_reparacion_id', profile.id)
     .order('updated_at', { ascending: false })
+
+  // Detectar piezas devueltas — tienen historial de CONTROL_CALIDAD previo
+  const piezasConDevolucion = piezas?.map((p: any) => {
+    const rechazo = p.historial?.find((h: any) => 
+      h.estado_nuevo === 'ASIGNADO' && h.motivo && h.usuario_nombre
+    )
+    return { ...p, devuelta: !!rechazo, motivo_devolucion: rechazo?.motivo, supervisor_devolucion: rechazo?.usuario_nombre }
+  })
 
   const rolLabel: Record<string, string> = {
     trabajador: 'Mis Piezas',
@@ -33,7 +41,7 @@ export default async function DashboardTrabajador({ profile }: { profile: Profil
         <h1 className={`text-2xl font-syne font-bold ${rolColor[profile.role] || 'text-white'}`}>
           {rolLabel[profile.role]}
         </h1>
-        <p className="text-sm text-[#475569]">{profile.nombre} — {piezas?.length || 0} piezas pendientes</p>
+        <p className="text-sm text-[#475569]">{profile.nombre} — {piezasConDevolucion?.length || 0} piezas pendientes</p>
       </div>
 
       {/* Scanner rápido */}
@@ -52,7 +60,7 @@ export default async function DashboardTrabajador({ profile }: { profile: Profil
       </Link>
 
       {/* Lista de piezas */}
-      {!piezas?.length ? (
+      {!piezasConDevolucion?.length ? (
         <div className="card p-16 text-center">
           <Hammer size={40} className="text-[#1E2D42] mx-auto mb-4" />
           <p className="text-[#475569] font-medium">Sin piezas pendientes</p>
@@ -63,7 +71,7 @@ export default async function DashboardTrabajador({ profile }: { profile: Profil
           <p className="text-xs font-semibold text-[#475569] uppercase tracking-wider px-1">
             Piezas asignadas
           </p>
-          {piezas.map((p: any) => (
+          {piezasConDevolucion?.map((p: any) => (
             <Link key={p.id} href={`/scan/${p.id}`}
               className="card p-4 flex items-center gap-3 hover:border-[#00D4FF]/30 active:scale-[0.98] transition-all">
               <div className="w-10 h-10 rounded-xl bg-[#131920] flex items-center justify-center flex-shrink-0">
@@ -82,10 +90,17 @@ export default async function DashboardTrabajador({ profile }: { profile: Profil
                   {p.requiere_reparacion && <span className="text-xs text-amber-400">Rep</span>}
                   {p.requiere_pintura && <span className="text-xs text-pink-400">Pin</span>}
                   {p.requiere_pulido && <span className="text-xs text-rose-400">Pul</span>}
-                  <span className={`text-xs badge ${ESTADO_COLOR[p.estado as keyof typeof ESTADO_COLOR]} ml-auto`}>
-                    {ESTADO_LABELS[p.estado as keyof typeof ESTADO_LABELS]}
-                  </span>
+                  {p.devuelta ? (
+                    <span className="text-xs badge bg-red-500/20 text-red-300 border-red-500/30 ml-auto">⚠ Devuelta</span>
+                  ) : (
+                    <span className={`text-xs badge ${ESTADO_COLOR[p.estado as keyof typeof ESTADO_COLOR]} ml-auto`}>
+                      {ESTADO_LABELS[p.estado as keyof typeof ESTADO_LABELS]}
+                    </span>
+                  )}
                 </div>
+                {p.devuelta && (
+                  <p className="text-xs text-red-400 mt-1 truncate">"{p.motivo_devolucion}"</p>
+                )}
               </div>
               <ChevronRight size={16} className="text-[#2D3F55] flex-shrink-0" />
             </Link>
