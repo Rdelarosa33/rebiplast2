@@ -254,3 +254,4 @@ export default function ScanPiezaPage({ params }: { params: { id: string } }) {
     </div>
   )
 }
+ 
