@@ -30,6 +30,10 @@ export default function CargaLaboral({ trabajadores }: { trabajadores: Trabajado
   if (!trabajadores || trabajadores.length === 0) {
     return <p className="text-sm text-[#475569] text-center py-4">Sin trabajadores disponibles ({String(trabajadores?.length)})</p>
   }
+  
+  // Debug: mostrar primer trabajador
+  const debug = trabajadores[0]
+  console.log('Primer trabajador:', debug)
 
   return (
     <>
@@ -41,7 +45,7 @@ export default function CargaLaboral({ trabajadores }: { trabajadores: Trabajado
               t.carga <= 2 ? 'bg-amber-500/10 border-amber-500/30 hover:border-amber-500/60' :
               'bg-red-500/10 border-red-500/30 hover:border-red-500/60'
             }`}>
-            <p className="text-sm font-medium text-white">{t.nombre}</p>
+            <p className="text-sm font-medium text-white">{t.nombre || `ID: ${t.id?.slice(0,8)}`}</p>
             <p className="text-xs text-[#475569]">{t.apellido}</p>
             <div className="flex items-center gap-1.5 mt-1.5">
               <div className={`w-2 h-2 rounded-full ${
