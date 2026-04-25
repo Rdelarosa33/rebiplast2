@@ -5,6 +5,7 @@ import { Package, Clock, ShieldCheck, CheckCircle, Users, AlertTriangle } from '
 import AsignarPieza from './AsignarPieza'
 import PorAsignarList from './PorAsignarList'
 import CargaLaboral from './CargaLaboral'
+import { SeccionPorRecibir, SeccionPorAsignar } from './SeccionColapsable'
 
 export const revalidate = 0
 
@@ -18,6 +19,7 @@ export default async function DashboardSupervisor() {
     { data: listos },
     { data: trabajadores },
     { data: cargaData },
+    { data: piezasActivas },
   ] = await Promise.all([
     // Por recibir: en traslado
     supabase.from('piezas')
@@ -37,6 +39,10 @@ export default async function DashboardSupervisor() {
     supabase.from('piezas')
       .select('*, siniestro:siniestros(numero_siniestro,placa,taller_origen)')
       .eq('estado','LISTO_ENTREGA').order('updated_at', { ascending: false }),
+    // Siniestros con mezcla de asignados y sin asignar
+    supabase.from('piezas')
+      .select('siniestro_id, estado, trabajador_reparacion_id, siniestro:siniestros(numero_siniestro,placa)')
+      .in('estado', ['RECIBIDO','ASIGNADO','EN_REPARACION','EN_PREPARACION','EN_PINTURA','EN_PULIDO']),
     // Trabajadores
     supabase.from('profiles')
       .select('id, nombre, apellido, role')
@@ -47,6 +53,22 @@ export default async function DashboardSupervisor() {
       .select('id, nombre, lado, estado, requiere_reparacion, requiere_pintura, requiere_pulido, trabajador_reparacion_id, siniestro:siniestros(numero_siniestro, placa)')
       .in('estado', ['ASIGNADO', 'EN_REPARACION', 'EN_PREPARACION', 'EN_PINTURA', 'EN_PULIDO', 'CONTROL_CALIDAD']),
   ])
+
+  // Detectar siniestros con piezas mixtas (algunas asignadas, otras no)
+  const siniestroMap: Record<string, { sin_asignar: number, con_asignar: number, info: any }> = {}
+  piezasActivas?.forEach((p: any) => {
+    if (!siniestroMap[p.siniestro_id]) {
+      siniestroMap[p.siniestro_id] = { sin_asignar: 0, con_asignar: 0, info: p.siniestro }
+    }
+    if (!p.trabajador_reparacion_id) {
+      siniestroMap[p.siniestro_id].sin_asignar++
+    } else {
+      siniestroMap[p.siniestro_id].con_asignar++
+    }
+  })
+  const siniestrosIncompletos = Object.entries(siniestroMap)
+    .filter(([_, v]) => v.sin_asignar > 0 && v.con_asignar > 0)
+    .map(([id, v]) => ({ id, ...v }))
 
   const cargaPorTrabajador: Record<string, number> = {}
   const piezasPorTrabajador: Record<string, any[]> = {}
@@ -86,6 +108,31 @@ export default async function DashboardSupervisor() {
         ))}
       </div>
 
+      {/* Alerta siniestros incompletos */}
+      {siniestrosIncompletos.length > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <AlertTriangle size={16} className="text-amber-400" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-amber-400">
+                {siniestrosIncompletos.length} siniestro{siniestrosIncompletos.length > 1 ? 's' : ''} con piezas sin asignar
+              </p>
+              <div className="mt-2 space-y-1">
+                {siniestrosIncompletos.map((s: any) => (
+                  <div key={s.id} className="flex items-center gap-2">
+                    <span className="text-xs font-mono text-amber-300">{s.info?.numero_siniestro}</span>
+                    <span className="text-xs text-[#94A3B8]">{s.info?.placa}</span>
+                    <span className="text-xs text-amber-400/70">— {s.sin_asignar} pieza{s.sin_asignar > 1 ? 's' : ''} sin asignar</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Carga laboral */}
       <div className="card p-5">
         <div className="flex items-center gap-2 mb-4">
@@ -95,44 +142,9 @@ export default async function DashboardSupervisor() {
         <CargaLaboral trabajadores={trabajadoresConCarga} />
       </div>
 
-      {/* Por recibir */}
-      {(porRecibir?.length || 0) > 0 && (
-        <div className="card p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Package size={18} className="text-blue-400" />
-            <h2 className="font-syne font-semibold text-white">Por recibir</h2>
-            <span className="text-xs bg-[#131920] border border-[#1E2D42] text-[#94A3B8] px-2 py-0.5 rounded-full ml-auto">{porRecibir?.length}</span>
-          </div>
-          <div className="space-y-2">
-            {porRecibir?.map((p: any) => (
-              <div key={p.id} className="flex items-center gap-3 p-3 bg-[#131920] rounded-xl">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white truncate">{p.nombre}</p>
-                  <p className="text-xs text-[#475569]">
-                    <span className="font-mono text-[#00D4FF]">{p.siniestro?.numero_siniestro}</span>
-                    {' · '}{p.siniestro?.placa}
-                  </p>
-                </div>
-                <Link href={`/scan/${p.id}`} className="text-xs bg-blue-500/20 text-blue-300 border border-blue-500/30 px-3 py-1.5 rounded-lg hover:bg-blue-500/30 transition-colors flex-shrink-0">
-                  Confirmar recepción
-                </Link>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {(porRecibir?.length || 0) > 0 && <SeccionPorRecibir piezas={porRecibir || []} icon={Package} color="text-blue-400" />}
 
-      {/* Por asignar */}
-      {(recibidas?.length || 0) > 0 && (
-        <div className="card p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Clock size={18} className="text-violet-400" />
-            <h2 className="font-syne font-semibold text-white">Por asignar</h2>
-            <span className="text-xs bg-[#131920] border border-[#1E2D42] text-[#94A3B8] px-2 py-0.5 rounded-full ml-auto">{recibidas?.length}</span>
-          </div>
-          <PorAsignarList piezas={recibidas || []} trabajadores={trabajadoresConCarga} />
-        </div>
-      )}
+      {(recibidas?.length || 0) > 0 && <SeccionPorAsignar piezas={recibidas || []} trabajadores={trabajadoresConCarga} icon={Clock} color="text-violet-400" />}
 
       {/* Control de calidad */}
       {(enCalidad?.length || 0) > 0 && (
