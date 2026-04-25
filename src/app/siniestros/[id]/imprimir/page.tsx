@@ -49,7 +49,7 @@ export default function ImprimirEtiquetasPage() {
   return (
     <>
       {/* Controles */}
-      <div className="no-print fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shadow">
+      <div className="no-print fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 px-4 py-3 flex items-center justify-between shadow">
         <Link href={`/siniestros/${id}`} className="flex items-center gap-2 text-gray-600 hover:text-gray-900">
           <ArrowLeft size={18} />
           <span className="text-sm">Volver</span>
@@ -66,7 +66,7 @@ export default function ImprimirEtiquetasPage() {
       </div>
 
       {/* Etiquetas */}
-      <div className="print-container pt-20">
+      <div className="print-container pt-4 pb-20">
         {siniestro.piezas?.map((pieza: any, i: number) => (
           <div key={pieza.id} className="etiqueta">
             {/* QR */}
