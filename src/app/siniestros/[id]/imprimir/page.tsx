@@ -27,10 +27,10 @@ export default function ImprimirEtiquetasPage() {
         for (const pieza of data.piezas || []) {
           const url = `${window.location.origin}/scan/${pieza.id}`
           qrs[pieza.id] = await QRCode.toDataURL(url, {
-            width: 120,
-            margin: 1,
+            width: 200,
+            margin: 2,
             color: { dark: '#000000', light: '#ffffff' },
-            errorCorrectionLevel: 'M'
+            errorCorrectionLevel: 'H'
           })
         }
         setQrImages(qrs)
@@ -66,7 +66,7 @@ export default function ImprimirEtiquetasPage() {
       </div>
 
       {/* Etiquetas */}
-      <div className="print-container pt-16">
+      <div className="print-container pt-20">
         {siniestro.piezas?.map((pieza: any, i: number) => (
           <div key={pieza.id} className="etiqueta">
             {/* QR */}
@@ -129,7 +129,7 @@ export default function ImprimirEtiquetasPage() {
           .etiqueta {
             width: 56mm;
             height: 55mm;
-            padding: 1.5mm 2mm;
+            padding: 6mm 2mm 1.5mm;
             margin: 0;
             page-break-after: always;
             display: flex;
