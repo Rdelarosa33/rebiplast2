@@ -121,11 +121,13 @@ export default async function DashboardSupervisor() {
               </p>
               <div className="mt-2 space-y-1">
                 {siniestrosIncompletos.map((s: any) => (
-                  <div key={s.id} className="flex items-center gap-2">
+                  <Link key={s.id} href={`/siniestros/${s.id}`}
+                    className="flex items-center gap-2 hover:bg-amber-500/10 rounded-lg px-2 py-1 -mx-2 transition-colors">
                     <span className="text-xs font-mono text-amber-300">{s.info?.numero_siniestro}</span>
                     <span className="text-xs text-[#94A3B8]">{s.info?.placa}</span>
                     <span className="text-xs text-amber-400/70">— {s.sin_asignar} pieza{s.sin_asignar > 1 ? 's' : ''} sin asignar</span>
-                  </div>
+                    <span className="text-xs text-amber-400 ml-auto">Ver →</span>
+                  </Link>
                 ))}
               </div>
             </div>
