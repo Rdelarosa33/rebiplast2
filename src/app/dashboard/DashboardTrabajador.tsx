@@ -6,13 +6,8 @@ import { Hammer, QrCode, ChevronRight } from 'lucide-react'
 export default async function DashboardTrabajador({ profile }: { profile: Profile }) {
   const supabase = await createClient()
 
-  const estadosPorRol: Record<string, string[]> = {
-    reparacion: ['ASIGNADO', 'EN_REPARACION'],
-    preparacion: ['EN_PREPARACION'],
-    pintura: ['EN_PINTURA', 'EN_PULIDO'],
-  }
-
-  const estados = estadosPorRol[profile.role] || []
+  // Trabajador polivalente — ve todas las etapas de trabajo
+  const estados = ['ASIGNADO', 'EN_REPARACION', 'EN_PREPARACION', 'EN_PINTURA', 'EN_PULIDO']
 
   const { data: piezas } = await supabase
     .from('piezas')
@@ -21,15 +16,13 @@ export default async function DashboardTrabajador({ profile }: { profile: Profil
     .order('updated_at', { ascending: false })
 
   const rolLabel: Record<string, string> = {
-    reparacion: 'Reparación',
-    preparacion: 'Preparación',
-    pintura: 'Pintura',
+    trabajador: 'Mis Piezas',
+    recojo_trabajador: 'Mis Piezas',
   }
 
   const rolColor: Record<string, string> = {
-    reparacion: 'text-amber-400',
-    preparacion: 'text-orange-400',
-    pintura: 'text-pink-400',
+    trabajador: 'text-amber-400',
+    recojo_trabajador: 'text-teal-400',
   }
 
   return (

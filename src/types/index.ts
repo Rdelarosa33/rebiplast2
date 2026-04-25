@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'recojo' | 'supervisor' | 'reparacion' | 'preparacion' | 'pintura'
+export type UserRole = 'admin' | 'recojo' | 'supervisor' | 'trabajador' | 'recojo_trabajador'
 
 export type PiezaEstado =
   | 'REGISTRADO'
@@ -135,18 +135,16 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   admin: 'Administrador',
   recojo: 'Recojo',
   supervisor: 'Supervisor',
-  reparacion: 'Reparación',
-  preparacion: 'Preparación',
-  pintura: 'Pintura',
+  trabajador: 'Trabajador',
+  recojo_trabajador: 'Recojo / Trabajador',
 }
 
 export const ROLE_COLOR: Record<UserRole, string> = {
   admin: 'bg-red-500/20 text-red-300',
   recojo: 'bg-blue-500/20 text-blue-300',
   supervisor: 'bg-purple-500/20 text-purple-300',
-  reparacion: 'bg-amber-500/20 text-amber-300',
-  preparacion: 'bg-orange-500/20 text-orange-300',
-  pintura: 'bg-pink-500/20 text-pink-300',
+  trabajador: 'bg-amber-500/20 text-amber-300',
+  recojo_trabajador: 'bg-teal-500/20 text-teal-300',
 }
 
 export const SEGUROS: SeguroTipo[] = ['RIMAC', 'PACIFICO', 'MAPFRE', 'LA_POSITIVA', 'HDI', 'INTERSEGURO', 'TALLER', 'OTRO']
@@ -223,24 +221,16 @@ export function getAcciones(estado: PiezaEstado, role: UserRole, pieza?: Partial
     }
   }
 
-  // REPARACION — sin confirmación
-  if (role === 'reparacion') {
+  // TRABAJADOR — polivalente, trabaja en cualquier etapa asignada
+  if (role === 'trabajador' || role === 'recojo_trabajador') {
     if (estado === 'ASIGNADO' || estado === 'EN_REPARACION') {
       const siguiente = pieza?.requiere_pintura ? 'EN_PREPARACION' : 'CONTROL_CALIDAD'
       const label = pieza?.requiere_pintura ? 'Terminado — pasar a preparación' : 'Terminado — pasar a control de calidad'
       acciones.push({ label, estado_nuevo: siguiente, color: 'btn-primary' })
     }
-  }
-
-  // PREPARACION — sin confirmación
-  if (role === 'preparacion') {
     if (estado === 'EN_PREPARACION') {
       acciones.push({ label: 'Terminado — pasar a pintura', estado_nuevo: 'EN_PINTURA', color: 'btn-primary' })
     }
-  }
-
-  // PINTURA — sin confirmación
-  if (role === 'pintura') {
     if (estado === 'EN_PINTURA') {
       acciones.push({ label: 'Terminado — pasar a control de calidad', estado_nuevo: 'CONTROL_CALIDAD', color: 'btn-primary' })
       if (pieza?.es_faro || pieza?.requiere_pulido) {
@@ -249,6 +239,16 @@ export function getAcciones(estado: PiezaEstado, role: UserRole, pieza?: Partial
     }
     if (estado === 'EN_PULIDO') {
       acciones.push({ label: 'Pulido terminado — pasar a control de calidad', estado_nuevo: 'CONTROL_CALIDAD', color: 'btn-primary' })
+    }
+  }
+
+  // RECOJO_TRABAJADOR también puede recoger y entregar
+  if (role === 'recojo_trabajador') {
+    if (estado === 'REGISTRADO') {
+      acciones.push({ label: 'Marcar en traslado', estado_nuevo: 'EN_TRASLADO', color: 'btn-primary' })
+    }
+    if (estado === 'LISTO_ENTREGA') {
+      acciones.push({ label: 'Confirmar entrega al taller', estado_nuevo: 'ENTREGADO', color: 'btn-success' })
     }
   }
 
