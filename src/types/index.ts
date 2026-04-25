@@ -205,12 +205,14 @@ export function getAcciones(estado: PiezaEstado, role: UserRole, pieza?: Partial
     // Control de calidad — aprobar o devolver al mismo trabajador
     if (estado === 'CONTROL_CALIDAD') {
       acciones.push({ label: '✓ Aprobar — Listo para entrega', estado_nuevo: 'LISTO_ENTREGA', color: 'btn-success' })
-      acciones.push({
-        label: '✗ Rechazar — Devolver al trabajador',
-        estado_nuevo: 'ASIGNADO',
-        color: 'btn-danger',
-        requiere_motivo: true,
-      })
+      // Rechazar según qué incluye la pieza
+      if (pieza?.requiere_pulido || pieza?.es_faro) {
+        acciones.push({ label: '✗ Rechazar — Problema en pulido', estado_nuevo: 'EN_PULIDO', color: 'btn-danger', requiere_motivo: true })
+      }
+      if (pieza?.requiere_pintura) {
+        acciones.push({ label: '✗ Rechazar — Problema en pintura', estado_nuevo: 'EN_PINTURA', color: 'btn-danger', requiere_motivo: true })
+      }
+      acciones.push({ label: '✗ Rechazar — Problema en reparación', estado_nuevo: 'ASIGNADO', color: 'btn-danger', requiere_motivo: true })
     }
     // Polivalente — puede avanzar cualquier etapa
     if (estado === 'ASIGNADO' || estado === 'EN_REPARACION') {
@@ -228,30 +230,48 @@ export function getAcciones(estado: PiezaEstado, role: UserRole, pieza?: Partial
     }
   }
 
-  // TRABAJADOR — polivalente, trabaja en cualquier etapa asignada
+  // TRABAJADOR — polivalente con flujo de aceptar/rechazar/terminar
   if (role === 'trabajador' || role === 'recojo_trabajador') {
-    if (estado === 'ASIGNADO' || estado === 'EN_REPARACION') {
+
+    // ASIGNADO — aceptar o rechazar (devuelve al estado anterior)
+    if (estado === 'ASIGNADO') {
+      acciones.push({ label: '✓ Aceptar trabajo', estado_nuevo: 'EN_REPARACION', color: 'btn-primary' })
+      acciones.push({ label: '✗ Rechazar — devolver', estado_nuevo: 'RECIBIDO', color: 'btn-danger', requiere_motivo: true })
+    }
+
+    // EN_REPARACION — terminar
+    if (estado === 'EN_REPARACION') {
       const siguiente = pieza?.requiere_pintura ? 'EN_PREPARACION' : 'CONTROL_CALIDAD'
-      const label = pieza?.requiere_pintura ? 'Terminado — pasar a preparación' : 'Terminado — pasar a control de calidad'
+      const label = pieza?.requiere_pintura ? 'Terminado — pasar a preparación' : 'Terminado — control de calidad'
       acciones.push({ label, estado_nuevo: siguiente, color: 'btn-primary' })
     }
+
+    // EN_PREPARACION — aceptar, rechazar (vuelve a reparación) o terminar
     if (estado === 'EN_PREPARACION') {
       acciones.push({ label: 'Terminado — pasar a pintura', estado_nuevo: 'EN_PINTURA', color: 'btn-primary' })
+      acciones.push({ label: '✗ Rechazar — problema en reparación', estado_nuevo: 'ASIGNADO', color: 'btn-danger', requiere_motivo: true })
     }
+
+    // EN_PINTURA — terminar o rechazar (vuelve a preparación)
     if (estado === 'EN_PINTURA') {
-      acciones.push({ label: 'Terminado — pasar a control de calidad', estado_nuevo: 'CONTROL_CALIDAD', color: 'btn-primary' })
       if (pieza?.es_faro || pieza?.requiere_pulido) {
-        acciones.push({ label: 'Enviar a pulido', estado_nuevo: 'EN_PULIDO', color: 'btn-secondary' })
+        acciones.push({ label: 'Terminado — pasar a pulido', estado_nuevo: 'EN_PULIDO', color: 'btn-primary' })
+      } else {
+        acciones.push({ label: 'Terminado — control de calidad', estado_nuevo: 'CONTROL_CALIDAD', color: 'btn-primary' })
       }
+      acciones.push({ label: '✗ Rechazar — problema en preparación', estado_nuevo: 'EN_PREPARACION', color: 'btn-danger', requiere_motivo: true })
     }
+
+    // EN_PULIDO — terminar
     if (estado === 'EN_PULIDO') {
-      acciones.push({ label: 'Pulido terminado — pasar a control de calidad', estado_nuevo: 'CONTROL_CALIDAD', color: 'btn-primary' })
+      acciones.push({ label: 'Terminado — control de calidad', estado_nuevo: 'CONTROL_CALIDAD', color: 'btn-primary' })
+      acciones.push({ label: '✗ Rechazar — problema en pintura', estado_nuevo: 'EN_PINTURA', color: 'btn-danger', requiere_motivo: true })
     }
   }
 
   // RECOJO_TRABAJADOR también puede recoger y entregar
   if (role === 'recojo_trabajador') {
-    if (estado === 'REGISTRADO') {
+    if (estado === 'EN_TRASLADO') {
       acciones.push({ label: 'Marcar en traslado', estado_nuevo: 'EN_TRASLADO', color: 'btn-primary' })
     }
     if (estado === 'LISTO_ENTREGA') {
