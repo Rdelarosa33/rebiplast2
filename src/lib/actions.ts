@@ -30,10 +30,15 @@ export async function cambiarEstadoPieza(
 
   if (!pieza) return { error: 'Pieza no encontrada' }
 
-  // Actualizar estado
+  // Actualizar estado y trabajador si se asigna
+  const updateData: any = { estado: estadoNuevo, updated_at: new Date().toISOString() }
+  if (trabajadorId) {
+    updateData.trabajador_reparacion_id = trabajadorId
+    updateData.trabajador_reparacion_nombre = trabajadorNombre
+  }
   const { error } = await supabase
     .from('piezas')
-    .update({ estado: estadoNuevo, updated_at: new Date().toISOString() })
+    .update(updateData)
     .eq('id', piezaId)
 
   if (error) return { error: error.message }

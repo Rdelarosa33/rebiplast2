@@ -3,6 +3,7 @@ import { ESTADO_COLOR, ESTADO_LABELS } from '@/types'
 import Link from 'next/link'
 import { Package, Clock, ShieldCheck, CheckCircle, Users, AlertTriangle } from 'lucide-react'
 import AsignarPieza from './AsignarPieza'
+import PorAsignarList from './PorAsignarList'
 
 export const revalidate = 0
 
@@ -147,28 +148,7 @@ export default async function DashboardSupervisor() {
             <h2 className="font-syne font-semibold text-white">Por asignar</h2>
             <span className="text-xs bg-[#131920] border border-[#1E2D42] text-[#94A3B8] px-2 py-0.5 rounded-full ml-auto">{recibidas?.length}</span>
           </div>
-          <div className="space-y-3">
-            {recibidas?.map((p: any) => (
-              <div key={p.id} className="p-3 bg-[#131920] rounded-xl space-y-2">
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white truncate">{p.nombre}</p>
-                    <p className="text-xs text-[#475569]">
-                      {p.lado !== 'N/A' ? `${p.lado} · ` : ''}
-                      <span className="font-mono text-[#00D4FF]">{p.siniestro?.numero_siniestro}</span>
-                      {' · '}{p.siniestro?.placa}
-                    </p>
-                    <div className="flex gap-1 mt-1">
-                      {p.requiere_reparacion && <span className="text-xs text-amber-400">Rep</span>}
-                      {p.requiere_pintura && <span className="text-xs text-pink-400">Pin</span>}
-                      {p.requiere_pulido && <span className="text-xs text-rose-400">Pul</span>}
-                    </div>
-                  </div>
-                </div>
-                <AsignarPieza piezaId={p.id} trabajadores={trabajadoresConCarga} />
-              </div>
-            ))}
-          </div>
+          <PorAsignarList piezas={recibidas || []} trabajadores={trabajadoresConCarga} />
         </div>
       )}
 
