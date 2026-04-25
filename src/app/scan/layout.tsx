@@ -40,9 +40,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       ? [{ href: '/siniestros', icon: ClipboardList, label: 'Siniestros' }]
       : []),
     { href: '/scan', icon: QrCode, label: 'Escanear' },
-    ...(profile?.role === 'supervisor' || profile?.role === 'admin'
-      ? [{ href: '/supervisor', icon: ShieldCheck, label: 'Supervisor' }]
-      : []),
     ...(['trabajador','recojo_trabajador'].includes(profile?.role || '')
       ? [{ href: '/trabajador', icon: Hammer, label: 'Mis Piezas' }]
       : []),

@@ -1,8 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
-import { revalidatePath } from 'next/cache'
 import { ESTADO_COLOR, ESTADO_LABELS } from '@/types'
 import Link from 'next/link'
-import { Package, Clock, ShieldCheck, CheckCircle, Users } from 'lucide-react'
+import { Package, Clock, ShieldCheck, CheckCircle, Users, AlertTriangle } from 'lucide-react'
 import AsignarPieza from './AsignarPieza'
 
 export const revalidate = 0
@@ -12,25 +11,40 @@ export default async function DashboardSupervisor() {
 
   const [
     { data: porRecibir },
-    { data: porAsignar },
-    { data: sinTrabajador },
+    { data: recibidas },
     { data: enCalidad },
     { data: listos },
     { data: trabajadores },
+    { data: cargaData },
   ] = await Promise.all([
-    supabase.from('piezas').select('*, siniestro:siniestros(numero_siniestro,placa,taller_origen)').eq('estado','EN_TRASLADO').order('created_at'),
-    supabase.from('piezas').select('*, siniestro:siniestros(numero_siniestro,placa,taller_origen)').eq('estado','RECIBIDO').order('created_at'),
-    supabase.from('piezas').select('*, siniestro:siniestros(numero_siniestro,placa,taller_origen)').eq('estado','ASIGNADO').is('trabajador_reparacion_id', null).order('created_at'),
-    supabase.from('piezas').select('*, siniestro:siniestros(numero_siniestro,placa,taller_origen)').eq('estado','CONTROL_CALIDAD').order('updated_at', { ascending: false }),
-    supabase.from('piezas').select('*, siniestro:siniestros(numero_siniestro,placa,taller_origen)').eq('estado','LISTO_ENTREGA').order('updated_at', { ascending: false }),
-    supabase.from('profiles').select('id, nombre, apellido, role').in('role', ['trabajador', 'recojo_trabajador']).eq('activo', true).order('nombre'),
+    // Por recibir: en traslado
+    supabase.from('piezas')
+      .select('*, siniestro:siniestros(numero_siniestro,placa,taller_origen)')
+      .eq('estado','EN_TRASLADO').order('created_at'),
+    // Por asignar: recibidas O asignadas sin trabajador
+    supabase.from('piezas')
+      .select('*, siniestro:siniestros(numero_siniestro,placa,taller_origen)')
+      .in('estado', ['RECIBIDO', 'ASIGNADO'])
+      .is('trabajador_reparacion_id', null)
+      .order('created_at'),
+    // En control de calidad
+    supabase.from('piezas')
+      .select('*, siniestro:siniestros(numero_siniestro,placa,taller_origen)')
+      .eq('estado','CONTROL_CALIDAD').order('updated_at', { ascending: false }),
+    // Listas para entrega
+    supabase.from('piezas')
+      .select('*, siniestro:siniestros(numero_siniestro,placa,taller_origen)')
+      .eq('estado','LISTO_ENTREGA').order('updated_at', { ascending: false }),
+    // Trabajadores
+    supabase.from('profiles')
+      .select('id, nombre, apellido, role')
+      .in('role', ['trabajador', 'recojo_trabajador', 'supervisor'])
+      .eq('activo', true).order('nombre'),
+    // Carga laboral
+    supabase.from('piezas')
+      .select('trabajador_reparacion_id')
+      .in('estado', ['ASIGNADO', 'EN_REPARACION', 'EN_PREPARACION', 'EN_PINTURA', 'EN_PULIDO', 'CONTROL_CALIDAD']),
   ])
-
-  // Obtener carga laboral de cada trabajador — cuenta todas las piezas activas asignadas
-  const { data: cargaData } = await supabase
-    .from('piezas')
-    .select('trabajador_reparacion_id, estado')
-    .in('estado', ['ASIGNADO', 'EN_REPARACION', 'EN_PREPARACION', 'EN_PINTURA', 'EN_PULIDO', 'CONTROL_CALIDAD'])
 
   const cargaPorTrabajador: Record<string, number> = {}
   cargaData?.forEach((p: any) => {
@@ -44,58 +58,19 @@ export default async function DashboardSupervisor() {
     carga: cargaPorTrabajador[t.id] || 0
   })).sort((a: any, b: any) => a.carga - b.carga)
 
-  const Section = ({ title, piezas, icon: Icon, color, emptyMsg, showAsignar }: any) => (
-    <div className="card p-5">
-      <div className="flex items-center gap-2 mb-4">
-        <Icon size={18} className={color} />
-        <h2 className="font-syne font-semibold text-white">{title}</h2>
-        <span className="text-xs bg-[#131920] border border-[#1E2D42] text-[#94A3B8] px-2 py-0.5 rounded-full ml-auto">{piezas?.length || 0}</span>
-      </div>
-      {!piezas?.length ? (
-        <p className="text-sm text-[#475569] text-center py-4">{emptyMsg}</p>
-      ) : (
-        <div className="space-y-2">
-          {piezas.map((p: any) => (
-            <div key={p.id} className="p-3 bg-[#131920] rounded-xl space-y-2">
-              <div className="flex items-center gap-3">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white truncate">{p.nombre}</p>
-                  <p className="text-xs text-[#475569]">
-                    {p.lado !== 'N/A' ? `${p.lado} · ` : ''}
-                    <span className="font-mono text-[#00D4FF]">{p.siniestro?.numero_siniestro}</span>
-                    {' · '}{p.siniestro?.placa}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className={`badge ${ESTADO_COLOR[p.estado as keyof typeof ESTADO_COLOR]} text-xs`}>
-                    {ESTADO_LABELS[p.estado as keyof typeof ESTADO_LABELS]}
-                  </span>
-                  <Link href={`/scan/${p.id}`} className="text-xs text-[#00D4FF] hover:underline">Ver</Link>
-                </div>
-              </div>
-              {showAsignar && (
-                <AsignarPieza piezaId={p.id} trabajadores={trabajadoresConCarga} />
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-
   return (
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-syne font-bold text-white">Panel Supervisor</h1>
-        <p className="text-sm text-[#475569] mt-0.5">Recepciones, asignaciones y control de calidad</p>
+        <p className="text-sm text-[#475569] mt-0.5">Gestión de piezas y equipo</p>
       </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: 'Por recibir', value: porRecibir?.length || 0, color: 'text-blue-400' },
-          { label: 'Por asignar', value: (porAsignar?.length || 0) + (sinTrabajador?.length || 0), color: 'text-violet-400' },
-          { label: 'En calidad', value: enCalidad?.length || 0, color: 'text-purple-400' },
+          { label: 'Por asignar', value: recibidas?.length || 0, color: 'text-violet-400' },
+          { label: 'Control calidad', value: enCalidad?.length || 0, color: 'text-purple-400' },
           { label: 'Listo entrega', value: listos?.length || 0, color: 'text-green-400' },
         ].map(k => (
           <div key={k.label} className="card p-3 text-center">
@@ -109,7 +84,7 @@ export default async function DashboardSupervisor() {
       <div className="card p-5">
         <div className="flex items-center gap-2 mb-4">
           <Users size={18} className="text-[#00D4FF]" />
-          <h2 className="font-syne font-semibold text-white">Carga laboral del equipo</h2>
+          <h2 className="font-syne font-semibold text-white">Carga laboral</h2>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
           {trabajadoresConCarga.map((t: any) => (
@@ -137,12 +112,131 @@ export default async function DashboardSupervisor() {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-5">
-        <Section title="Por recibir" piezas={porRecibir} icon={Package} color="text-blue-400" emptyMsg="No hay piezas en traslado" showAsignar={false} />
-        <Section title="Por asignar" piezas={[...(porAsignar || []), ...(sinTrabajador || [])]} icon={Clock} color="text-violet-400" emptyMsg="No hay piezas sin asignar" showAsignar={true} />
-        <Section title="Control de calidad" piezas={enCalidad} icon={ShieldCheck} color="text-purple-400" emptyMsg="No hay piezas en calidad" showAsignar={false} />
-        <Section title="Listo para entrega" piezas={listos} icon={CheckCircle} color="text-green-400" emptyMsg="No hay piezas listas" showAsignar={false} />
-      </div>
+      {/* Por recibir */}
+      {(porRecibir?.length || 0) > 0 && (
+        <div className="card p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Package size={18} className="text-blue-400" />
+            <h2 className="font-syne font-semibold text-white">Por recibir</h2>
+            <span className="text-xs bg-[#131920] border border-[#1E2D42] text-[#94A3B8] px-2 py-0.5 rounded-full ml-auto">{porRecibir?.length}</span>
+          </div>
+          <div className="space-y-2">
+            {porRecibir?.map((p: any) => (
+              <div key={p.id} className="flex items-center gap-3 p-3 bg-[#131920] rounded-xl">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-white truncate">{p.nombre}</p>
+                  <p className="text-xs text-[#475569]">
+                    <span className="font-mono text-[#00D4FF]">{p.siniestro?.numero_siniestro}</span>
+                    {' · '}{p.siniestro?.placa}
+                  </p>
+                </div>
+                <Link href={`/scan/${p.id}`} className="text-xs bg-blue-500/20 text-blue-300 border border-blue-500/30 px-3 py-1.5 rounded-lg hover:bg-blue-500/30 transition-colors flex-shrink-0">
+                  Confirmar recepción
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Por asignar */}
+      {(recibidas?.length || 0) > 0 && (
+        <div className="card p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Clock size={18} className="text-violet-400" />
+            <h2 className="font-syne font-semibold text-white">Por asignar</h2>
+            <span className="text-xs bg-[#131920] border border-[#1E2D42] text-[#94A3B8] px-2 py-0.5 rounded-full ml-auto">{recibidas?.length}</span>
+          </div>
+          <div className="space-y-3">
+            {recibidas?.map((p: any) => (
+              <div key={p.id} className="p-3 bg-[#131920] rounded-xl space-y-2">
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white truncate">{p.nombre}</p>
+                    <p className="text-xs text-[#475569]">
+                      {p.lado !== 'N/A' ? `${p.lado} · ` : ''}
+                      <span className="font-mono text-[#00D4FF]">{p.siniestro?.numero_siniestro}</span>
+                      {' · '}{p.siniestro?.placa}
+                    </p>
+                    <div className="flex gap-1 mt-1">
+                      {p.requiere_reparacion && <span className="text-xs text-amber-400">Rep</span>}
+                      {p.requiere_pintura && <span className="text-xs text-pink-400">Pin</span>}
+                      {p.requiere_pulido && <span className="text-xs text-rose-400">Pul</span>}
+                    </div>
+                  </div>
+                </div>
+                <AsignarPieza piezaId={p.id} trabajadores={trabajadoresConCarga} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Control de calidad */}
+      {(enCalidad?.length || 0) > 0 && (
+        <div className="card p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <ShieldCheck size={18} className="text-purple-400" />
+            <h2 className="font-syne font-semibold text-white">Control de calidad</h2>
+            <span className="text-xs bg-[#131920] border border-[#1E2D42] text-[#94A3B8] px-2 py-0.5 rounded-full ml-auto">{enCalidad?.length}</span>
+          </div>
+          <div className="space-y-2">
+            {enCalidad?.map((p: any) => (
+              <div key={p.id} className="flex items-center gap-3 p-3 bg-[#131920] rounded-xl">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-white truncate">{p.nombre}</p>
+                  <p className="text-xs text-[#475569]">
+                    <span className="font-mono text-[#00D4FF]">{p.siniestro?.numero_siniestro}</span>
+                    {' · '}{p.siniestro?.placa}
+                  </p>
+                  {p.trabajador_reparacion_nombre && (
+                    <p className="text-xs text-[#475569]">Por: {p.trabajador_reparacion_nombre}</p>
+                  )}
+                </div>
+                <Link href={`/scan/${p.id}`} className="text-xs bg-purple-500/20 text-purple-300 border border-purple-500/30 px-3 py-1.5 rounded-lg hover:bg-purple-500/30 transition-colors flex-shrink-0">
+                  Revisar
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Listo para entrega */}
+      {(listos?.length || 0) > 0 && (
+        <div className="card p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <CheckCircle size={18} className="text-green-400" />
+            <h2 className="font-syne font-semibold text-white">Listo para entrega</h2>
+            <span className="text-xs bg-[#131920] border border-[#1E2D42] text-[#94A3B8] px-2 py-0.5 rounded-full ml-auto">{listos?.length}</span>
+          </div>
+          <div className="space-y-2">
+            {listos?.map((p: any) => (
+              <div key={p.id} className="flex items-center gap-3 p-3 bg-[#131920] rounded-xl">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-white truncate">{p.nombre}</p>
+                  <p className="text-xs text-[#475569]">
+                    <span className="font-mono text-[#00D4FF]">{p.siniestro?.numero_siniestro}</span>
+                    {' · '}{p.siniestro?.placa}
+                  </p>
+                </div>
+                <span className="text-xs bg-green-500/20 text-green-300 border border-green-500/30 px-2 py-0.5 rounded-full flex-shrink-0">
+                  Listo
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Estado vacío */}
+      {!porRecibir?.length && !recibidas?.length && !enCalidad?.length && !listos?.length && (
+        <div className="card p-12 text-center">
+          <CheckCircle size={40} className="text-green-400 mx-auto mb-3" />
+          <p className="text-white font-semibold">Todo al día</p>
+          <p className="text-sm text-[#475569] mt-1">No hay piezas pendientes</p>
+        </div>
+      )}
     </div>
   )
 }

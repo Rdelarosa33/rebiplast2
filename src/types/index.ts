@@ -196,24 +196,23 @@ export function getAcciones(estado: PiezaEstado, role: UserRole, pieza?: Partial
     }
   }
 
-  // SUPERVISOR via SCAN — solo confirmar recepción y control de calidad
-  // La asignación se hace desde el panel supervisor, no desde el scan
+  // SUPERVISOR
   if (role === 'supervisor') {
+    // Confirmar recepción
     if (estado === 'EN_TRASLADO') {
       acciones.push({ label: 'Confirmar recepción en taller', estado_nuevo: 'RECIBIDO', color: 'btn-primary' })
     }
+    // Control de calidad — aprobar o devolver al mismo trabajador
     if (estado === 'CONTROL_CALIDAD') {
       acciones.push({ label: '✓ Aprobar — Listo para entrega', estado_nuevo: 'LISTO_ENTREGA', color: 'btn-success' })
-      const estadoDevolucion = pieza?.requiere_pintura ? 'EN_PINTURA' : 'EN_REPARACION'
-      const labelDevolucion = pieza?.requiere_pintura ? 'Devolver a pintura' : 'Devolver a reparación'
       acciones.push({
-        label: labelDevolucion,
-        estado_nuevo: estadoDevolucion,
+        label: '✗ Rechazar — Devolver al trabajador',
+        estado_nuevo: 'ASIGNADO',
         color: 'btn-danger',
         requiere_motivo: true,
       })
     }
-    // Supervisor polivalente — puede trabajar en cualquier etapa si es necesario
+    // Polivalente — puede avanzar cualquier etapa
     if (estado === 'ASIGNADO' || estado === 'EN_REPARACION') {
       const siguiente = pieza?.requiere_pintura ? 'EN_PREPARACION' : 'CONTROL_CALIDAD'
       acciones.push({ label: 'Marcar reparación terminada', estado_nuevo: siguiente, color: 'btn-secondary' })
