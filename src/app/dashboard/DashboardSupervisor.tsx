@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Package, Clock, ShieldCheck, CheckCircle, Users, AlertTriangle } from 'lucide-react'
 import AsignarPieza from './AsignarPieza'
 import PorAsignarList from './PorAsignarList'
+import CargaLaboral from './CargaLaboral'
 
 export const revalidate = 0
 
@@ -41,22 +42,26 @@ export default async function DashboardSupervisor() {
       .select('id, nombre, apellido, role')
       .in('role', ['trabajador', 'recojo_trabajador', 'supervisor'])
       .eq('activo', true).order('nombre'),
-    // Carga laboral
+    // Carga laboral con detalle de piezas
     supabase.from('piezas')
-      .select('trabajador_reparacion_id')
+      .select('id, nombre, lado, estado, requiere_reparacion, requiere_pintura, requiere_pulido, trabajador_reparacion_id, siniestro:siniestros(numero_siniestro, placa)')
       .in('estado', ['ASIGNADO', 'EN_REPARACION', 'EN_PREPARACION', 'EN_PINTURA', 'EN_PULIDO', 'CONTROL_CALIDAD']),
   ])
 
   const cargaPorTrabajador: Record<string, number> = {}
+  const piezasPorTrabajador: Record<string, any[]> = {}
   cargaData?.forEach((p: any) => {
     if (p.trabajador_reparacion_id) {
       cargaPorTrabajador[p.trabajador_reparacion_id] = (cargaPorTrabajador[p.trabajador_reparacion_id] || 0) + 1
+      if (!piezasPorTrabajador[p.trabajador_reparacion_id]) piezasPorTrabajador[p.trabajador_reparacion_id] = []
+      piezasPorTrabajador[p.trabajador_reparacion_id].push(p)
     }
   })
 
   const trabajadoresConCarga = (trabajadores || []).map((t: any) => ({
     ...t,
-    carga: cargaPorTrabajador[t.id] || 0
+    carga: cargaPorTrabajador[t.id] || 0,
+    piezas: piezasPorTrabajador[t.id] || []
   })).sort((a: any, b: any) => a.carga - b.carga)
 
   return (
@@ -87,30 +92,7 @@ export default async function DashboardSupervisor() {
           <Users size={18} className="text-[#00D4FF]" />
           <h2 className="font-syne font-semibold text-white">Carga laboral</h2>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-          {trabajadoresConCarga.map((t: any) => (
-            <div key={t.id} className={`p-3 rounded-xl border ${
-              t.carga === 0 ? 'bg-green-500/10 border-green-500/30' :
-              t.carga <= 2 ? 'bg-amber-500/10 border-amber-500/30' :
-              'bg-red-500/10 border-red-500/30'
-            }`}>
-              <p className="text-sm font-medium text-white">{t.nombre}</p>
-              <p className="text-xs text-[#475569]">{t.apellido}</p>
-              <div className="flex items-center gap-1.5 mt-1.5">
-                <div className={`w-2 h-2 rounded-full ${
-                  t.carga === 0 ? 'bg-green-400' :
-                  t.carga <= 2 ? 'bg-amber-400' : 'bg-red-400'
-                }`} />
-                <span className={`text-xs font-semibold ${
-                  t.carga === 0 ? 'text-green-400' :
-                  t.carga <= 2 ? 'text-amber-400' : 'text-red-400'
-                }`}>
-                  {t.carga === 0 ? 'Libre' : `${t.carga} pieza${t.carga > 1 ? 's' : ''}`}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
+        <CargaLaboral trabajadores={trabajadoresConCarga} />
       </div>
 
       {/* Por recibir */}
