@@ -1,8 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
+import { revalidatePath } from 'next/cache'
 import { ESTADO_COLOR, ESTADO_LABELS } from '@/types'
 import Link from 'next/link'
 import { Package, Clock, ShieldCheck, CheckCircle, Users } from 'lucide-react'
 import AsignarPieza from './AsignarPieza'
+
+export const revalidate = 0
 
 export default async function DashboardSupervisor() {
   const supabase = await createClient()

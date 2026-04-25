@@ -196,15 +196,24 @@ export function getAcciones(estado: PiezaEstado, role: UserRole, pieza?: Partial
     }
   }
 
-  // SUPERVISOR — sin confirmación para flujo normal, con nota para devolver
+  // SUPERVISOR via SCAN — solo confirmar recepción y control de calidad
+  // La asignación se hace desde el panel supervisor, no desde el scan
   if (role === 'supervisor') {
     if (estado === 'EN_TRASLADO') {
       acciones.push({ label: 'Confirmar recepción en taller', estado_nuevo: 'RECIBIDO', color: 'btn-primary' })
     }
-    if (estado === 'RECIBIDO') {
-      acciones.push({ label: 'Asignar a trabajador', estado_nuevo: 'ASIGNADO', color: 'btn-primary' })
+    if (estado === 'CONTROL_CALIDAD') {
+      acciones.push({ label: '✓ Aprobar — Listo para entrega', estado_nuevo: 'LISTO_ENTREGA', color: 'btn-success' })
+      const estadoDevolucion = pieza?.requiere_pintura ? 'EN_PINTURA' : 'EN_REPARACION'
+      const labelDevolucion = pieza?.requiere_pintura ? 'Devolver a pintura' : 'Devolver a reparación'
+      acciones.push({
+        label: labelDevolucion,
+        estado_nuevo: estadoDevolucion,
+        color: 'btn-danger',
+        requiere_motivo: true,
+      })
     }
-    // Supervisor polivalente — puede trabajar en cualquier etapa
+    // Supervisor polivalente — puede trabajar en cualquier etapa si es necesario
     if (estado === 'ASIGNADO' || estado === 'EN_REPARACION') {
       const siguiente = pieza?.requiere_pintura ? 'EN_PREPARACION' : 'CONTROL_CALIDAD'
       acciones.push({ label: 'Marcar reparación terminada', estado_nuevo: siguiente, color: 'btn-secondary' })
@@ -217,21 +226,6 @@ export function getAcciones(estado: PiezaEstado, role: UserRole, pieza?: Partial
     }
     if (estado === 'EN_PULIDO') {
       acciones.push({ label: 'Marcar pulido terminado', estado_nuevo: 'CONTROL_CALIDAD', color: 'btn-secondary' })
-    }
-    if (estado === 'CONTROL_CALIDAD') {
-      acciones.push({ label: '✓ Aprobar — Listo para entrega', estado_nuevo: 'LISTO_ENTREGA', color: 'btn-success' })
-      // Devolver al estado anterior lógico
-      const estadoDevolucion = pieza?.requiere_pintura ? 'EN_PINTURA' : 'EN_REPARACION'
-      const labelDevolucion = pieza?.requiere_pintura ? 'Devolver a pintura' : 'Devolver a reparación'
-      acciones.push({
-        label: labelDevolucion,
-        estado_nuevo: estadoDevolucion,
-        color: 'btn-danger',
-        requiere_motivo: true,
-      })
-    }
-    if (estado === 'LISTO_ENTREGA') {
-      acciones.push({ label: 'Confirmar entrega', estado_nuevo: 'ENTREGADO', color: 'btn-success' })
     }
   }
 
