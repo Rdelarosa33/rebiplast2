@@ -63,7 +63,10 @@ export default function ScanPiezaPage({ params }: { params: { id: string } }) {
     </div>
   )
 
-  const acciones = profile ? getAcciones(pieza.estado, profile.role, pieza) : []
+  // Solo mostrar acciones si la pieza está asignada al trabajador logueado
+  const esMiPieza = profile?.role === 'admin' || profile?.role === 'supervisor' ||
+    pieza.trabajador_reparacion_id === profile?.id || !pieza.trabajador_reparacion_id
+  const acciones = (profile && esMiPieza) ? getAcciones(pieza.estado, profile.role, pieza) : []
   const historial = (pieza.historial || [])
     .filter((h: any) => h.estado_nuevo !== 'REGISTRADO')
     .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
