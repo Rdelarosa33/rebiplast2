@@ -17,9 +17,9 @@ export default async function DashboardSupervisor() {
     { data: recibidas },
     { data: enCalidad },
     { data: listos },
+    { data: piezasActivas },
     { data: trabajadores },
     { data: cargaData },
-    { data: piezasActivas },
   ] = await Promise.all([
     // Por recibir: en traslado
     supabase.from('piezas')
