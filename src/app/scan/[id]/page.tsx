@@ -64,9 +64,9 @@ export default function ScanPiezaPage({ params }: { params: { id: string } }) {
   )
 
   const acciones = profile ? getAcciones(pieza.estado, profile.role, pieza) : []
-  const historial = (pieza.historial || []).sort((a: any, b: any) =>
-    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  )
+  const historial = (pieza.historial || [])
+    .filter((h: any) => h.estado_nuevo !== 'REGISTRADO')
+    .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
   return (
     <div className="max-w-lg space-y-4">
