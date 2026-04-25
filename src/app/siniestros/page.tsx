@@ -7,13 +7,12 @@ const SEGUROS = ['RIMAC','PACIFICO','MAPFRE','LA_POSITIVA','HDI','INTERSEGURO','
 
 const ESTADOS_FILTRO: { key: string, label: string, estados: PiezaEstado[] }[] = [
   { key: 'todos', label: 'Todos', estados: [] },
-  { key: 'activos', label: 'En proceso', estados: ['REGISTRADO','EN_TRASLADO','RECIBIDO','ASIGNADO','EN_REPARACION','EN_PREPARACION','EN_PINTURA','EN_PULIDO','CONTROL_CALIDAD'] },
-  { key: 'registrado', label: 'Registrado', estados: ['REGISTRADO'] },
+  { key: 'activos', label: 'En proceso', estados: ['EN_TRASLADO','RECIBIDO','ASIGNADO','EN_REPARACION','EN_PREPARACION','EN_PINTURA','EN_PULIDO','CONTROL_CALIDAD'] },
   { key: 'traslado', label: 'En traslado', estados: ['EN_TRASLADO'] },
   { key: 'recibido', label: 'Recibido', estados: ['RECIBIDO'] },
-  { key: 'reparacion', label: 'Reparación', estados: ['EN_REPARACION','ASIGNADO'] },
-  { key: 'pintura', label: 'Pintura', estados: ['EN_PREPARACION','EN_PINTURA','EN_PULIDO'] },
-  { key: 'calidad', label: 'Calidad', estados: ['CONTROL_CALIDAD'] },
+  { key: 'reparacion', label: 'En reparación', estados: ['EN_REPARACION','ASIGNADO'] },
+  { key: 'pintura', label: 'En pintura', estados: ['EN_PREPARACION','EN_PINTURA','EN_PULIDO'] },
+  { key: 'calidad', label: 'Control calidad', estados: ['CONTROL_CALIDAD'] },
   { key: 'listo', label: 'Listo entrega', estados: ['LISTO_ENTREGA'] },
   { key: 'entregado', label: 'Entregado', estados: ['ENTREGADO'] },
 ]

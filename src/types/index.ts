@@ -199,10 +199,24 @@ export function getAcciones(estado: PiezaEstado, role: UserRole, pieza?: Partial
   // SUPERVISOR — sin confirmación para flujo normal, con nota para devolver
   if (role === 'supervisor') {
     if (estado === 'EN_TRASLADO') {
-      acciones.push({ label: 'Confirmar recepción', estado_nuevo: 'RECIBIDO', color: 'btn-primary' })
+      acciones.push({ label: 'Confirmar recepción en taller', estado_nuevo: 'RECIBIDO', color: 'btn-primary' })
     }
     if (estado === 'RECIBIDO') {
       acciones.push({ label: 'Asignar a trabajador', estado_nuevo: 'ASIGNADO', color: 'btn-primary' })
+    }
+    // Supervisor polivalente — puede trabajar en cualquier etapa
+    if (estado === 'ASIGNADO' || estado === 'EN_REPARACION') {
+      const siguiente = pieza?.requiere_pintura ? 'EN_PREPARACION' : 'CONTROL_CALIDAD'
+      acciones.push({ label: 'Marcar reparación terminada', estado_nuevo: siguiente, color: 'btn-secondary' })
+    }
+    if (estado === 'EN_PREPARACION') {
+      acciones.push({ label: 'Marcar preparación terminada', estado_nuevo: 'EN_PINTURA', color: 'btn-secondary' })
+    }
+    if (estado === 'EN_PINTURA') {
+      acciones.push({ label: 'Marcar pintura terminada', estado_nuevo: 'CONTROL_CALIDAD', color: 'btn-secondary' })
+    }
+    if (estado === 'EN_PULIDO') {
+      acciones.push({ label: 'Marcar pulido terminado', estado_nuevo: 'CONTROL_CALIDAD', color: 'btn-secondary' })
     }
     if (estado === 'CONTROL_CALIDAD') {
       acciones.push({ label: '✓ Aprobar — Listo para entrega', estado_nuevo: 'LISTO_ENTREGA', color: 'btn-success' })

@@ -21,12 +21,11 @@ export default async function DashboardSupervisor() {
     supabase.from('profiles').select('id, nombre, apellido, role').in('role', ['trabajador', 'recojo_trabajador']).eq('activo', true).order('nombre'),
   ])
 
-  // Obtener carga laboral de cada trabajador
+  // Obtener carga laboral de cada trabajador — cuenta todas las piezas activas asignadas
   const { data: cargaData } = await supabase
     .from('piezas')
     .select('trabajador_reparacion_id, estado')
-    .in('estado', ['ASIGNADO', 'EN_REPARACION', 'EN_PREPARACION', 'EN_PINTURA', 'EN_PULIDO'])
-    .not('trabajador_reparacion_id', 'is', null)
+    .in('estado', ['ASIGNADO', 'EN_REPARACION', 'EN_PREPARACION', 'EN_PINTURA', 'EN_PULIDO', 'CONTROL_CALIDAD'])
 
   const cargaPorTrabajador: Record<string, number> = {}
   cargaData?.forEach((p: any) => {
