@@ -142,9 +142,9 @@ export default async function DashboardSupervisor() {
         <CargaLaboral trabajadores={trabajadoresConCarga} />
       </div>
 
-      {(porRecibir?.length || 0) > 0 && <SeccionPorRecibir piezas={porRecibir || []} icon={Package} color="text-blue-400" />}
+      {(porRecibir?.length || 0) > 0 && <SeccionPorRecibir piezas={porRecibir || []} />}
 
-      {(recibidas?.length || 0) > 0 && <SeccionPorAsignar piezas={recibidas || []} trabajadores={trabajadoresConCarga} icon={Clock} color="text-violet-400" />}
+      {(recibidas?.length || 0) > 0 && <SeccionPorAsignar piezas={recibidas || []} trabajadores={trabajadoresConCarga} />}
 
       {/* Control de calidad */}
       {(enCalidad?.length || 0) > 0 && (

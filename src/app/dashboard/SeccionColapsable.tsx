@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { ChevronDown, ChevronUp, Package, Clock } from 'lucide-react'
 import { ESTADO_COLOR, ESTADO_LABELS } from '@/types'
 
 interface Pieza {
@@ -16,9 +16,11 @@ interface Pieza {
 
 const SEGUROS = ['RIMAC', 'PACIFICO', 'MAPFRE', 'LA_POSITIVA', 'HDI', 'INTERSEGURO', 'TALLER']
 
-export function SeccionPorRecibir({ piezas, icon: Icon, color }: { piezas: Pieza[], icon: any, color: string }) {
+export function SeccionPorRecibir({ piezas }: { piezas: Pieza[] }) {
   const [abierto, setAbierto] = useState(true)
   const [filtroSeguro, setFiltroSeguro] = useState('')
+  const Icon = Package
+  const color = 'text-blue-400'
 
   const filtradas = filtroSeguro
     ? piezas.filter(p => p.siniestro?.tipo_seguro === filtroSeguro)
@@ -81,7 +83,9 @@ export function SeccionPorRecibir({ piezas, icon: Icon, color }: { piezas: Pieza
   )
 }
 
-export function SeccionPorAsignar({ piezas, trabajadores, icon: Icon, color }: { piezas: any[], trabajadores: any[], icon: any, color: string }) {
+export function SeccionPorAsignar({ piezas, trabajadores }: { piezas: any[], trabajadores: any[] }) {
+  const Icon = Clock
+  const color = 'text-violet-400'
   const [abierto, setAbierto] = useState(true)
   const [filtroSeguro, setFiltroSeguro] = useState('')
 
