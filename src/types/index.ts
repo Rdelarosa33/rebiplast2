@@ -170,7 +170,7 @@ export function getAcciones(estado: PiezaEstado, role: UserRole, pieza?: Partial
   // ADMIN — puede mover a cualquier estado, siempre con nota
   if (role === 'admin') {
     const todos: PiezaEstado[] = [
-      'REGISTRADO','EN_TRASLADO','RECIBIDO','ASIGNADO',
+      'EN_TRASLADO','RECIBIDO','ASIGNADO',
       'EN_REPARACION','EN_PREPARACION','EN_PINTURA','EN_PULIDO',
       'CONTROL_CALIDAD','LISTO_ENTREGA','ENTREGADO'
     ]
