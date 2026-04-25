@@ -13,6 +13,7 @@ export default async function DashboardTrabajador({ profile }: { profile: Profil
     .from('piezas')
     .select('*, siniestro:siniestros(numero_siniestro, placa, taller_origen, tipo_seguro)')
     .in('estado', estados)
+    .eq('trabajador_reparacion_id', profile.id)
     .order('updated_at', { ascending: false })
 
   const rolLabel: Record<string, string> = {
@@ -77,7 +78,7 @@ export default async function DashboardTrabajador({ profile }: { profile: Profil
                   <span className="font-mono text-[#00D4FF]">{p.siniestro?.numero_siniestro}</span>
                   {' · '}{p.siniestro?.placa}
                 </p>
-                <div className="flex gap-2 mt-1">
+                <div className="flex gap-2 mt-1 items-center">
                   {p.requiere_reparacion && <span className="text-xs text-amber-400">Rep</span>}
                   {p.requiere_pintura && <span className="text-xs text-pink-400">Pin</span>}
                   {p.requiere_pulido && <span className="text-xs text-rose-400">Pul</span>}
