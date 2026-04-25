@@ -8,7 +8,9 @@ export async function cambiarEstadoPieza(
   piezaId: string,
   estadoNuevo: PiezaEstado,
   accion: string,
-  motivo?: string
+  motivo?: string,
+  trabajadorId?: string,
+  trabajadorNombre?: string
 ) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
