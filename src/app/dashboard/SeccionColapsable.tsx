@@ -24,7 +24,7 @@ export function SeccionPorRecibir({ piezas, icon: Icon, color }: { piezas: Pieza
     ? piezas.filter(p => p.siniestro?.tipo_seguro === filtroSeguro)
     : piezas
 
-  const segurosPresentes = [...new Set(piezas.map(p => p.siniestro?.tipo_seguro).filter(Boolean))]
+  const segurosPresentes = Array.from(new Set(piezas.map(p => p.siniestro?.tipo_seguro).filter(Boolean)))
 
   return (
     <div className="card overflow-hidden">
@@ -93,7 +93,7 @@ export function SeccionPorAsignar({ piezas, trabajadores, icon: Icon, color }: {
     ? piezas.filter(p => p.siniestro?.tipo_seguro === filtroSeguro)
     : piezas
 
-  const segurosPresentes = [...new Set(piezas.map(p => p.siniestro?.tipo_seguro).filter(Boolean))]
+  const segurosPresentes = Array.from(new Set(piezas.map(p => p.siniestro?.tipo_seguro).filter(Boolean)))
 
   return (
     <div className="card overflow-hidden">
