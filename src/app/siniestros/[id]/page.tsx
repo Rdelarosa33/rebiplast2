@@ -5,6 +5,7 @@ import { ESTADO_LABELS, ESTADO_COLOR } from '@/types'
 import { ArrowLeft, QrCode, Clock, CheckCircle, Printer } from 'lucide-react'
 import PiezaAcciones from './PiezaAcciones'
 import BotonQR from './BotonQR'
+import AsignarPiezaDetalle from './AsignarPiezaDetalle'
 
 export default async function SiniestroDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -22,6 +23,11 @@ export default async function SiniestroDetailPage({ params }: { params: Promise<
   const { data: profile } = user
     ? await supabase.from('profiles').select('*').eq('id', user.id).single()
     : { data: null }
+
+  // Cargar trabajadores para asignación (solo si es supervisor o admin)
+  const trabajadores = (profile?.role === 'supervisor' || profile?.role === 'admin')
+    ? (await supabase.from('profiles').select('id, nombre, apellido').in('role', ['trabajador','recojo_trabajador','supervisor']).eq('activo', true).order('nombre')).data || []
+    : []
 
   const piezas = siniestro.piezas || []
   const total = piezas.length
@@ -125,6 +131,13 @@ export default async function SiniestroDetailPage({ params }: { params: Promise<
                     </span>
                   </div>
                   <PiezaAcciones pieza={pieza} role={profile?.role} />
+                  {(profile?.role === 'supervisor' || profile?.role === 'admin') && 
+                   (pieza.estado === 'RECIBIDO' || (pieza.estado === 'ASIGNADO' && !pieza.trabajador_reparacion_id)) && (
+                    <AsignarPiezaDetalle piezaId={pieza.id} trabajadores={trabajadores} />
+                  )}
+                  {pieza.trabajador_reparacion_nombre && (
+                    <p className="text-xs text-amber-400 mt-1">👤 {pieza.trabajador_reparacion_nombre}</p>
+                  )}
                 </div>
               </div>
             </div>
