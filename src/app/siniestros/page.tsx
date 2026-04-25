@@ -5,6 +5,13 @@ import { Plus } from 'lucide-react'
 
 const SEGUROS = ['RIMAC','PACIFICO','MAPFRE','LA_POSITIVA','HDI','INTERSEGURO','TALLER']
 
+const ESTADO_PRIORIDAD: Record<string, number> = {
+  ENTREGADO: 11, LISTO_ENTREGA: 10, CONTROL_CALIDAD: 9,
+  EN_PULIDO: 8, EN_PINTURA: 7, EN_PREPARACION: 6,
+  EN_REPARACION: 5, ASIGNADO: 4, RECIBIDO: 3,
+  EN_TRASLADO: 2, REGISTRADO: 1,
+}
+
 const ESTADOS_FILTRO: { key: string, label: string, estados: PiezaEstado[] }[] = [
   { key: 'todos', label: 'Todos', estados: [] },
   { key: 'activos', label: 'En proceso', estados: ['EN_TRASLADO','RECIBIDO','ASIGNADO','EN_REPARACION','EN_PREPARACION','EN_PINTURA','EN_PULIDO','CONTROL_CALIDAD'] },
