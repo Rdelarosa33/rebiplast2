@@ -27,6 +27,10 @@ interface Trabajador {
 export default function CargaLaboral({ trabajadores }: { trabajadores: Trabajador[] }) {
   const [seleccionado, setSeleccionado] = useState<Trabajador | null>(null)
 
+  if (!trabajadores || trabajadores.length === 0) {
+    return <p className="text-sm text-[#475569] text-center py-4">Sin trabajadores disponibles ({String(trabajadores?.length)})</p>
+  }
+
   return (
     <>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
