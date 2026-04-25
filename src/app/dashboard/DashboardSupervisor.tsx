@@ -10,12 +10,14 @@ export default async function DashboardSupervisor() {
   const [
     { data: porRecibir },
     { data: porAsignar },
+    { data: sinTrabajador },
     { data: enCalidad },
     { data: listos },
     { data: trabajadores },
   ] = await Promise.all([
     supabase.from('piezas').select('*, siniestro:siniestros(numero_siniestro,placa,taller_origen)').eq('estado','EN_TRASLADO').order('created_at'),
     supabase.from('piezas').select('*, siniestro:siniestros(numero_siniestro,placa,taller_origen)').eq('estado','RECIBIDO').order('created_at'),
+    supabase.from('piezas').select('*, siniestro:siniestros(numero_siniestro,placa,taller_origen)').eq('estado','ASIGNADO').is('trabajador_reparacion_id', null).order('created_at'),
     supabase.from('piezas').select('*, siniestro:siniestros(numero_siniestro,placa,taller_origen)').eq('estado','CONTROL_CALIDAD').order('updated_at', { ascending: false }),
     supabase.from('piezas').select('*, siniestro:siniestros(numero_siniestro,placa,taller_origen)').eq('estado','LISTO_ENTREGA').order('updated_at', { ascending: false }),
     supabase.from('profiles').select('id, nombre, apellido, role').in('role', ['trabajador', 'recojo_trabajador']).eq('activo', true).order('nombre'),
@@ -89,7 +91,7 @@ export default async function DashboardSupervisor() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: 'Por recibir', value: porRecibir?.length || 0, color: 'text-blue-400' },
-          { label: 'Por asignar', value: porAsignar?.length || 0, color: 'text-violet-400' },
+          { label: 'Por asignar', value: (porAsignar?.length || 0) + (sinTrabajador?.length || 0), color: 'text-violet-400' },
           { label: 'En calidad', value: enCalidad?.length || 0, color: 'text-purple-400' },
           { label: 'Listo entrega', value: listos?.length || 0, color: 'text-green-400' },
         ].map(k => (
@@ -134,7 +136,7 @@ export default async function DashboardSupervisor() {
 
       <div className="grid lg:grid-cols-2 gap-5">
         <Section title="Por recibir" piezas={porRecibir} icon={Package} color="text-blue-400" emptyMsg="No hay piezas en traslado" showAsignar={false} />
-        <Section title="Por asignar" piezas={porAsignar} icon={Clock} color="text-violet-400" emptyMsg="No hay piezas sin asignar" showAsignar={true} />
+        <Section title="Por asignar" piezas={[...(porAsignar || []), ...(sinTrabajador || [])]} icon={Clock} color="text-violet-400" emptyMsg="No hay piezas sin asignar" showAsignar={true} />
         <Section title="Control de calidad" piezas={enCalidad} icon={ShieldCheck} color="text-purple-400" emptyMsg="No hay piezas en calidad" showAsignar={false} />
         <Section title="Listo para entrega" piezas={listos} icon={CheckCircle} color="text-green-400" emptyMsg="No hay piezas listas" showAsignar={false} />
       </div>

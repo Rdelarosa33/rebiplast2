@@ -9,7 +9,7 @@ const ESTADOS_FILTRO: { key: string, label: string, estados: PiezaEstado[] }[] =
   { key: 'todos', label: 'Todos', estados: [] },
   { key: 'activos', label: 'En proceso', estados: ['EN_TRASLADO','RECIBIDO','ASIGNADO','EN_REPARACION','EN_PREPARACION','EN_PINTURA','EN_PULIDO','CONTROL_CALIDAD'] },
   { key: 'traslado', label: 'En traslado', estados: ['EN_TRASLADO'] },
-  { key: 'recibido', label: 'Recibido', estados: ['RECIBIDO'] },
+  { key: 'recibido', label: 'Por ingresar', estados: ['RECIBIDO'] },
   { key: 'reparacion', label: 'En reparación', estados: ['EN_REPARACION','ASIGNADO'] },
   { key: 'pintura', label: 'En pintura', estados: ['EN_PREPARACION','EN_PINTURA','EN_PULIDO'] },
   { key: 'calidad', label: 'Control calidad', estados: ['CONTROL_CALIDAD'] },
