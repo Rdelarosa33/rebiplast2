@@ -26,6 +26,7 @@ export default function DashboardAdminClient({
   trabajadoresConCarga, porSeguro, porDia
 }: any) {
   const [periodoGrafico, setPeriodoGrafico] = useState<'7' | '14'>('14')
+  const [periodoRend, setPeriodoRend] = useState<'semana' | 'mes' | '3meses'>('mes')
 
   const pipelineData = Object.entries(pipeline).map(([key, value]) => ({
     name: PIPELINE_LABELS[key],
@@ -185,6 +186,62 @@ export default function DashboardAdminClient({
           </div>
         </div>
       )}
+      {/* Rendimiento por empleado */}
+      <div className="card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <TrendingUp size={18} className="text-[#00D4FF]" />
+            <h2 className="font-syne font-semibold text-white">Rendimiento por empleado</h2>
+          </div>
+          <div className="flex gap-1">
+            {(['semana', 'mes', '3meses'] as const).map(p => (
+              <button key={p} onClick={() => setPeriodoRend(p)}
+                className={`text-xs px-2 py-1 rounded-lg border transition-all ${periodoRend === p ? 'bg-[#00D4FF] text-[#080B12] border-[#00D4FF] font-semibold' : 'bg-[#131920] text-[#475569] border-[#1E2D42]'}`}>
+                {p === 'semana' ? '7d' : p === 'mes' ? '30d' : '90d'}
+              </button>
+            ))}
+          </div>
+        </div>
+        {!rendimiento?.length ? (
+          <p className="text-sm text-[#475569] text-center py-6">Sin datos de rendimiento</p>
+        ) : (
+          <div className="space-y-3">
+            {rendimiento.map((r: any) => (
+              <div key={r.id} className="p-3 bg-[#131920] rounded-xl">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-semibold text-white">{r.nombre}</p>
+                  <div className="flex gap-2">
+                    <span className="text-xs bg-green-500/20 text-green-300 border border-green-500/30 px-2 py-0.5 rounded-full">
+                      {r.terminadas} ✓
+                    </span>
+                    {r.devueltas > 0 && (
+                      <span className="text-xs bg-red-500/20 text-red-300 border border-red-500/30 px-2 py-0.5 rounded-full">
+                        {r.devueltas} ✗
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  {/* Barra calidad */}
+                  <div className="flex-1 bg-[#0D1117] rounded-full h-2">
+                    <div className="h-full rounded-full transition-all"
+                      style={{
+                        width: `${r.calidad}%`,
+                        backgroundColor: r.calidad >= 90 ? '#22C55E' : r.calidad >= 75 ? '#F59E0B' : '#EF4444'
+                      }} />
+                  </div>
+                  <span className={`text-xs font-bold w-10 text-right ${
+                    r.calidad >= 90 ? 'text-green-400' : r.calidad >= 75 ? 'text-amber-400' : 'text-red-400'
+                  }`}>{r.calidad}%</span>
+                  {r.tiempoPromedio && (
+                    <span className="text-xs text-[#475569]">{r.tiempoPromedio}h prom.</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

@@ -14,6 +14,7 @@ export default async function DashboardAdmin() {
     { data: siniestros30dias },
     { data: trabajadores },
     { data: rechazosCalidad },
+    { data: piezasRendimiento },
   ] = await Promise.all([
     // Piezas en proceso ahora
     supabase.from('piezas').select('estado, trabajador_reparacion_id, trabajador_reparacion_nombre, updated_at')
@@ -40,6 +41,11 @@ export default async function DashboardAdmin() {
       .eq('estado_nuevo', 'ASIGNADO')
       .not('motivo', 'is', null)
       .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
+    // Rendimiento por trabajador — piezas entregadas con trabajador asignado
+    supabase.from('piezas').select('trabajador_reparacion_id, trabajador_reparacion_nombre, updated_at, historial:historial_piezas(estado_nuevo, motivo, created_at)')
+      .eq('estado', 'ENTREGADO')
+      .not('trabajador_reparacion_id', 'is', null)
+      .gte('updated_at', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()),
   ])
 
   // Calcular carga por trabajador
@@ -94,6 +100,30 @@ export default async function DashboardAdmin() {
     }
   })
 
+  // Procesar rendimiento por trabajador
+  const rendimientoMap: Record<string, any> = {}
+  piezasRendimiento?.forEach((p: any) => {
+    const id = p.trabajador_reparacion_id
+    const nombre = p.trabajador_reparacion_nombre || 'Sin nombre'
+    if (!rendimientoMap[id]) {
+      rendimientoMap[id] = { id, nombre, terminadas: 0, devueltas: 0, tiempos: [] }
+    }
+    rendimientoMap[id].terminadas++
+    const fueDevuelta = p.historial?.some((h: any) => h.estado_nuevo === 'ASIGNADO' && h.motivo)
+    if (fueDevuelta) rendimientoMap[id].devueltas++
+    // Tiempo desde inicio a entrega
+    const inicio = p.historial?.find((h: any) => h.estado_nuevo === 'EN_REPARACION')
+    if (inicio) {
+      const horas = (new Date(p.updated_at).getTime() - new Date(inicio.created_at).getTime()) / (1000 * 60 * 60)
+      if (horas > 0 && horas < 720) rendimientoMap[id].tiempos.push(horas)
+    }
+  })
+  const rendimiento = Object.values(rendimientoMap).map((r: any) => ({
+    ...r,
+    calidad: r.terminadas > 0 ? Math.round(((r.terminadas - r.devueltas) / r.terminadas) * 100) : 100,
+    tiempoPromedio: r.tiempos.length > 0 ? +(r.tiempos.reduce((a: number, b: number) => a + b, 0) / r.tiempos.length).toFixed(1) : null
+  })).sort((a: any, b: any) => b.terminadas - a.terminadas)
+
   return (
     <DashboardAdminClient
       pipeline={pipeline}
@@ -106,6 +136,7 @@ export default async function DashboardAdmin() {
       trabajadoresConCarga={trabajadoresConCarga}
       porSeguro={porSeguro}
       porDia={porDia}
+      rendimiento={rendimiento}
     />
   )
 }
