@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Car, Check } from 'lucide-react'
+import { Car, Check, ChevronDown, ChevronUp } from 'lucide-react'
 
 interface Trabajador {
   id: string
@@ -14,6 +14,7 @@ interface Trabajador {
 export default function HabilitarRecojo({ trabajadores, supervisorId }: { trabajadores: Trabajador[], supervisorId: string }) {
   const [lista, setLista] = useState(trabajadores)
   const [loading, setLoading] = useState<string | null>(null)
+  const [abierto, setAbierto] = useState(false)
 
   const toggle = async (t: Trabajador) => {
     setLoading(t.id)
@@ -37,16 +38,18 @@ export default function HabilitarRecojo({ trabajadores, supervisorId }: { trabaj
   const habilitados = lista.filter(t => t.habilitado).length
 
   return (
-    <div className="card p-5">
-      <div className="flex items-center gap-2 mb-4">
+    <div className="card overflow-hidden">
+      <button onClick={() => setAbierto(!abierto)}
+        className="w-full flex items-center gap-2 p-4 hover:bg-[#131920] transition-colors">
         <Car size={18} className="text-[#00D4FF]" />
-        <h2 className="font-syne font-semibold text-white">Habilitar recojo hoy</h2>
-        <span className="text-xs bg-[#131920] border border-[#1E2D42] text-[#94A3B8] px-2 py-0.5 rounded-full ml-auto">
+        <h2 className="font-syne font-semibold text-white flex-1 text-left">Habilitar recojo hoy</h2>
+        <span className="text-xs bg-[#131920] border border-[#1E2D42] text-[#94A3B8] px-2 py-0.5 rounded-full">
           {habilitados} habilitados
         </span>
-      </div>
-      <p className="text-xs text-[#475569] mb-3">La habilitación expira al final del día</p>
-      <div className="space-y-2">
+        {abierto ? <ChevronUp size={16} className="text-[#475569]" /> : <ChevronDown size={16} className="text-[#475569]" />}
+      </button>
+      {abierto && <div className="px-4 pb-4 space-y-2">
+        <p className="text-xs text-[#475569] mb-2">La habilitación expira al final del día</p>
         {lista.map(t => (
           <button key={t.id} onClick={() => toggle(t)} disabled={loading === t.id}
             className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${
@@ -64,7 +67,7 @@ export default function HabilitarRecojo({ trabajadores, supervisorId }: { trabaj
             {t.habilitado && loading !== t.id && <span className="text-xs text-[#00D4FF] ml-auto">Habilitado</span>}
           </button>
         ))}
-      </div>
+      </div>}
     </div>
   )
 }
