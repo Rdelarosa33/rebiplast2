@@ -233,10 +233,13 @@ export function getAcciones(estado: PiezaEstado, role: UserRole, pieza?: Partial
   // TRABAJADOR — polivalente con flujo de aceptar/rechazar/terminar
   if (role === 'trabajador' || role === 'recojo_trabajador') {
 
-    // ASIGNADO — aceptar o rechazar (devuelve al estado anterior)
+    // ASIGNADO — empezar trabajo (o rechazar solo si es nueva, sin historial previo)
     if (estado === 'ASIGNADO') {
-      acciones.push({ label: '✓ Aceptar trabajo', estado_nuevo: 'EN_REPARACION', color: 'btn-primary' })
-      acciones.push({ label: '✗ Rechazar — devolver', estado_nuevo: 'RECIBIDO', color: 'btn-danger', requiere_motivo: true })
+      const esDevuelta = pieza?.historial?.some((h: any) => h.estado_nuevo === 'ASIGNADO' && h.motivo)
+      acciones.push({ label: esDevuelta ? '🔧 Empezar corrección' : '✓ Empezar trabajo', estado_nuevo: 'EN_REPARACION', color: 'btn-primary' })
+      if (!esDevuelta) {
+        acciones.push({ label: '✗ Rechazar — devolver', estado_nuevo: 'RECIBIDO', color: 'btn-danger', requiere_motivo: true })
+      }
     }
 
     // EN_REPARACION — terminar
