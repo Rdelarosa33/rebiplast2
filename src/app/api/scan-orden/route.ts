@@ -9,149 +9,36 @@ const USE_CLAUDE = false
 const USE_OPENAI = false
 // ================================================
 
-const PROMPT = `Eres un experto en leer órdenes de trabajo de talleres automotrices peruanos.
-Analiza esta imagen y extrae los datos. Sigue el mapeo exacto por seguro.
+const PROMPT = `Extrae datos de esta orden de trabajo de taller automotriz peruano. Responde SOLO con JSON.
 
-========================
-PASO 1: DETECTAR SEGURO
-========================
-Busca estos logos o palabras en la imagen:
-- "RIMAC" → tipo_seguro = RIMAC
-- "MAPFRE" → tipo_seguro = MAPFRE
-- "La Positiva" o "LA POSITIVA" → tipo_seguro = LA_POSITIVA
-- "Pacífico" o "PACIFICO" o "EA Corp" o "Alpiconsult" → tipo_seguro = PACIFICO
-- "INTERSEGURO" o "Qualität" o "AUTOLAND" → tipo_seguro = INTERSEGURO
-- "HDI" → tipo_seguro = HDI
-- Si no hay seguro reconocible → tipo_seguro = TALLER
+SEGUROS: RIMAC, MAPFRE, PACIFICO(o EA Corp), LA_POSITIVA, HDI, INTERSEGURO(o Qualität), TALLER, OTRO
 
-========================
-PASO 2: EXTRAER GIRADOR
-========================
-Busca CUALQUIERA de estas palabras clave en TODO el documento y extrae el nombre
-que esté al lado o debajo. El primero que encuentres es el girador:
+GIRADOR - busca nombre junto a estas palabras:
+Técnico, Perito, Asesor, Ajustador, Inspector, Liquidador, Realizado por, Jefe de Siniestros, Jefe de Taller, Nombre Usuario, VoBo, Autorizado por
+EXCEPCIÓN: INTERSEGURO → girador = "José Fernández" siempre.
 
-  "Técnico" / "TÉCNICO"
-  "Técnico Siniestros" / "TÉCNICO SINIESTROS"
-  "Técnico de Vehículos"
-  "Perito" / "PERITO"
-  "Asesor" / "ASESOR"
-  "Asesor Técnico"
-  "Ajustador" / "AJUSTADOR"
-  "Nombre Usuario" / "NOMBRE USUARIO"
-  "Realizado por" / "REALIZADO POR"
-  "Jefe de Siniestros"
-  "Jefe de Taller"
-  "Inspector"
-  "Liquidador"
-  "Autorizado por"
-  "VoBo" (el nombre o firma al lado)
+TALLER ORIGEN - busca junto a: Atención a Taller, Taller Principal, Cliente, Sede, "a los señores"
 
-EXCEPCIÓN: Si el seguro es INTERSEGURO → girador = "José Fernández" siempre.
+NÚMERO DE ORDEN por seguro:
+- RIMAC fmt1: campo "N°" al inicio | fmt2: "NRO DE OC"
+- MAPFRE: número después de "ORDEN DE TRABAJO"
+- LA POSITIVA: "N° OC"
+- PACIFICO: "NumOS" o "ORDEN DE TRABAJO Nro."
+- INTERSEGURO: "ORDEN DE TRABAJO No."
 
-========================
- (si no identificaste el seguro o no encontraste el girador)
-========================
-Si el tipo_seguro es OTRO o el nombre_girador sigue en null, busca CUALQUIERA de estas
-palabras clave en TODO el documento y extrae el nombre que esté al lado o debajo:
+PLACA: buscar en "Placa", "Rodaje", "PLACA"
+SINIESTRO: buscar en "Siniestro", "SINIESTRO", "CASO"
 
-Palabras clave para girador (en cualquier seguro):
-  "Técnico" / "TÉCNICO"
-  "Perito" / "PERITO"
-  "Asesor" / "ASESOR"
-  "Ajustador" / "AJUSTADOR"
-  "Nombre Usuario" / "NOMBRE USUARIO"
-  "Realizado por" / "REALIZADO POR"
-  "Jefe de Siniestros"
-  "Jefe de Taller"
-  "Asesor Técnico"
-  "Técnico de Vehículos"
-  "Técnico Siniestros"
-  "Inspector"
-  "Liquidador"
-  "Responsable"
-  "Autorizado por"
-  "VoBo" (la firma o nombre al lado)
+PIEZAS - extrae cada servicio:
+- "REP", "REPARA", "REPARAR", "REPARACION" → requiere_reparacion=true, tipo="R"
+- "PINTURA", "+ Pintura", "RP" → requiere_pintura=true, tipo="RP"
+- LH=Izquierdo, RH=Derecho, DELT=Frontal, POST=Posterior
+- FARO, NEBLINERO → es_faro=true
+- Ignorar subtotales, IGV, totales, filas vacías
+- MAPFRE: cada línea "REP xxx" es una pieza separada
+- INTERSEGURO: pieza está en campo "Observaciones"
 
-Palabras clave para taller origen (en cualquier seguro):
-  "Atención a Taller" / "ATENCIÓN A TALLER"
-  "Taller Principal" / "TALLER PRINCIPAL"
-  "Cliente:" (cuando es taller concesionario)
-  "Sede:" o "SEDE"
-  "a los señores [NOMBRE]"
-  "Proveedor:" cuando no es Rebiplast
-
-========================
-PASO 5: EXTRAER PIEZAS
-========================
-Busca la sección de trabajos/servicios y extrae cada pieza:
-
-RIMAC formato 1: tabla con columnas Item/Cantidad/Descripción
-  - Cada fila con descripción es una pieza
-  - "REPARA", "REPARAR" → requiere_reparacion=true, tipo_trabajo="R"
-
-RIMAC formato 2: tabla con columnas CÓDIGO/DESCRIPCIÓN
-  - Filas con "SERVICIO" en CÓDIGO → la DESCRIPCIÓN es la pieza
-  - "REPARACION DE..." → tipo_trabajo="R"
-  - "REPARACION Y PINTURA DE..." → tipo_trabajo="RP", requiere_pintura=true
-
-MAPFRE: tabla "DESCRIPCIÓN Y EVALUACIÓN DE DAÑOS"
-  - Filas con "REP" al inicio → cada línea REP es una pieza separada
-  - Ejemplo: "REP FUNDA DEL" y "REP REJILLA DEL" son 2 piezas diferentes
-
-LA POSITIVA: tabla "Cambio/Reparacion por" + "Descripción"
-  - La descripción después de "Reparación /" es la pieza
-  - Si dice "+ Pintura" → requiere_pintura=true
-
-PACIFICO (EA Corp): tabla "OPERACION/DESCRIPCION"
-  - Cada fila es una pieza
-  - "Reparacion" al final → tipo_trabajo="R"
-  - "Pintura" al final → tipo_trabajo="RP"
-
-INTERSEGURO (Qualität): campo "Observaciones"
-  - "OT POR REPUESTO : FUNDA POST SUP" → pieza = "FUNDA POST SUP"
-
-REGLAS GENERALES PARA PIEZAS:
-  - LH = lado Izquierdo, RH = lado Derecho
-  - DELT o DELANTERA = Frontal, POST o POSTERIOR = Posterior
-  - FARO, NEBLINERO, FARO DELANTERO = es_faro=true
-  - IGNORAR filas de SUBTOTAL, IGV, TOTAL, filas vacías
-
-========================
-FORMATO DE RESPUESTA
-========================
-Devuelve SOLO este JSON sin markdown ni explicaciones:
-{
-  "numero_siniestro": null,
-  "numero_orden": null,
-  "expediente": null,
-  "poliza": null,
-  "placa": null,
-  "marca": null,
-  "modelo": null,
-  "anio": null,
-  "color": null,
-  "vin": null,
-  "nombre_asegurado": null,
-  "telefono_asegurado": null,
-  "tipo_seguro": "RIMAC|PACIFICO|MAPFRE|LA_POSITIVA|HDI|INTERSEGURO|TALLER|OTRO",
-  "nombre_girador": null,
-  "taller_origen": null,
-  "fecha_recojo": null,
-  "observaciones": null,
-  "piezas": [
-    {
-      "nombre": "nombre de la pieza",
-      "lado": "Izquierdo|Derecho|Frontal|Posterior|N/A",
-      "color": null,
-      "requiere_reparacion": true,
-      "requiere_pintura": false,
-      "es_faro": false,
-      "requiere_pulido": false,
-      "tipo_trabajo": "R|RP",
-      "precio": null
-    }
-  ]
-}`
+{"numero_siniestro":null,"numero_orden":null,"expediente":null,"poliza":null,"placa":null,"marca":null,"modelo":null,"anio":null,"color":null,"vin":null,"nombre_asegurado":null,"telefono_asegurado":null,"tipo_seguro":"RIMAC","nombre_girador":null,"taller_origen":null,"fecha_recojo":null,"observaciones":null,"piezas":[{"nombre":"","lado":"N/A","color":null,"requiere_reparacion":true,"requiere_pintura":false,"es_faro":false,"requiere_pulido":false,"tipo_trabajo":"R","precio":null}]}`
 
 async function procesarConGoogleVision(base64: string) {
   const apiKey = process.env.GOOGLE_VISION_API_KEY
@@ -175,8 +62,8 @@ async function procesarConGoogleVision(base64: string) {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const response = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
-    max_tokens: 2000,
-    messages: [{ role: 'user', content: `${PROMPT}\n\nTexto extraído de la orden:\n\n${textoExtraido}` }]
+    max_tokens: 1000,
+    messages: [{ role: 'user', content: `${PROMPT}\n\nTexto extraído:\n${textoExtraido}` }]
   })
   const text = response.content[0].type === 'text' ? response.content[0].text : ''
   return text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
@@ -186,7 +73,7 @@ async function procesarConClaude(base64: string, mediaType: string) {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const response = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
-    max_tokens: 2000,
+    max_tokens: 1000,
     messages: [{
       role: 'user',
       content: [
@@ -207,7 +94,7 @@ async function procesarConOpenAI(base64: string, mediaType: string) {
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
     body: JSON.stringify({
       model: 'gpt-4o',
-      max_tokens: 2000,
+      max_tokens: 1000,
       messages: [{
         role: 'user',
         content: [
