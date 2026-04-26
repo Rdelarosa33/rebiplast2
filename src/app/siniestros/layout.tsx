@@ -43,7 +43,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     ...(['trabajador','recojo_trabajador'].includes(profile?.role || '')
       ? [{ href: '/trabajador', icon: Hammer, label: 'Mis Piezas' }]
       : []),
-    ...(profile?.role === 'recojo' || profile?.role === 'recojo_trabajador' || profile?.role === 'admin'
+    ...(profile?.role === 'recojo' || profile?.role === 'trabajador' || profile?.role === 'admin' || profile?.role === 'supervisor'
       ? [{ href: '/siniestros/nuevo', icon: Package, label: 'Recojo' }]
       : []),
     ...(profile?.role === 'admin'
