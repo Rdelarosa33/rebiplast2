@@ -6,11 +6,14 @@ import AsignarPieza from './AsignarPieza'
 import PorAsignarList from './PorAsignarList'
 import CargaLaboral from './CargaLaboral'
 import { SeccionPorRecibir, SeccionPorAsignar } from './SeccionColapsable'
+import HabilitarRecojo from './HabilitarRecojo'
 
 export const revalidate = 0
 
 export default async function DashboardSupervisor() {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const supervisorId = user?.id || ''
 
   const [
     { data: porRecibir },
@@ -19,6 +22,7 @@ export default async function DashboardSupervisor() {
     { data: listos },
     { data: piezasActivas },
     { data: trabajadores },
+    { data: habilitaciones },
     { data: cargaData },
   ] = await Promise.all([
     // Por recibir: en traslado
@@ -48,6 +52,10 @@ export default async function DashboardSupervisor() {
       .select('id, nombre, apellido, role')
       .in('role', ['trabajador', 'recojo_trabajador', 'supervisor'])
       .eq('activo', true).order('nombre'),
+    // Habilitaciones recojo hoy
+    supabase.from('habilitaciones_recojo')
+      .select('trabajador_id')
+      .eq('fecha', new Date().toISOString().split('T')[0]),
     // Carga laboral con detalle de piezas
     supabase.from('piezas')
       .select('id, nombre, lado, estado, requiere_reparacion, requiere_pintura, requiere_pulido, trabajador_reparacion_id, siniestro:siniestros(numero_siniestro, placa)')
@@ -80,11 +88,17 @@ export default async function DashboardSupervisor() {
     }
   })
 
+  const habilitadosHoy = new Set((habilitaciones || []).map((h: any) => h.trabajador_id))
+
   const trabajadoresConCarga = (trabajadores || []).map((t: any) => ({
     ...t,
     carga: cargaPorTrabajador[t.id] || 0,
     piezas: piezasPorTrabajador[t.id] || []
   })).sort((a: any, b: any) => a.carga - b.carga)
+
+  const soloTrabajadores = (trabajadores || [])
+    .filter((t: any) => t.role === 'trabajador')
+    .map((t: any) => ({ ...t, habilitado: habilitadosHoy.has(t.id) }))
 
   return (
     <div className="space-y-5">
@@ -134,6 +148,9 @@ export default async function DashboardSupervisor() {
           </div>
         </div>
       )}
+
+      {/* Habilitar recojo */}
+      <HabilitarRecojo trabajadores={soloTrabajadores} supervisorId={supervisorId} />
 
       {/* Carga laboral */}
       <div className="card p-5">
