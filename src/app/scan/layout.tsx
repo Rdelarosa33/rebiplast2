@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Profile, ROLE_LABELS, ROLE_COLOR } from '@/types'
 import {
-  LayoutDashboard, ClipboardList, QrCode, Users, UserCog,
+  LayoutDashboard, ClipboardList, QrCode, Users, UserCog, CreditCard,
   LogOut, Wrench, ShieldCheck, Hammer, Package,
   ChevronLeft, ChevronRight, X, Menu
 } from 'lucide-react'
@@ -63,7 +63,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       ? [{ href: '/supervisor', icon: ShieldCheck, label: 'Supervisor' }]
       : []),
     ...(profile?.role === 'admin'
-      ? [{ href: '/admin/usuarios', icon: UserCog, label: 'Usuarios' }]
+      ? [{ href: '/admin/usuarios', icon: UserCog, label: 'Usuarios' }, { href: '/admin/suscripcion', icon: CreditCard, label: 'Suscripción' }]
+      : []),
+    ...(profile?.role === 'owner'
+      ? [{ href: '/admin/suscripcion', icon: CreditCard, label: 'Suscripción' }]
       : []),
   ]
 
