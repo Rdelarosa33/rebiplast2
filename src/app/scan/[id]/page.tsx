@@ -44,6 +44,9 @@ export default function ScanPiezaPage({ params }: { params: { id: string } }) {
     } else {
       setSuccess(`✓ ${ESTADO_LABELS[accion.estado_nuevo]} — ${new Date().toLocaleString('es-PE')}`)
       setPieza(prev => prev ? { ...prev, estado: accion.estado_nuevo } : prev)
+      if (profile?.role === 'trabajador' || profile?.role === 'recojo_trabajador') {
+        setTimeout(() => router.push('/trabajador'), 1500)
+      }
     }
     setAccionLoading(false)
     setModal(null)
@@ -257,4 +260,3 @@ export default function ScanPiezaPage({ params }: { params: { id: string } }) {
     </div>
   )
 }
- 
