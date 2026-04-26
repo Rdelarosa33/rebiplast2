@@ -18,9 +18,8 @@ export default async function DashboardTrabajador({ profile }: { profile: Profil
     .order('updated_at', { ascending: false })
 
   const piezasConInfo = piezas?.map((p: any) => {
-    const rechazo = p.historial?.find((h: any) =>
-      h.estado_nuevo === 'ASIGNADO' && h.motivo && h.usuario_nombre
-    )
+    const rechazos = p.historial?.filter((h: any) => h.estado_nuevo === 'ASIGNADO' && h.motivo && h.usuario_nombre) || []
+    const rechazo = rechazos.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
     return { ...p, devuelta: !!rechazo, motivo_devolucion: rechazo?.motivo, supervisor_devolucion: rechazo?.usuario_nombre }
   }) || []
 
