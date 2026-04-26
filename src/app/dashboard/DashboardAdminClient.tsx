@@ -23,9 +23,10 @@ const PIPELINE_COLORS: Record<string, string> = {
 export default function DashboardAdminClient({
   pipeline, piezasActivasTotal, terminadasHoy, siniestrosActivos,
   sinAsignarAtrasadas, rechazosTotal, terminadas30dias,
-  trabajadoresConCarga, porSeguro, porDia
+  trabajadoresConCarga, porSeguro, porDia, rendimiento
 }: any) {
   const [periodoGrafico, setPeriodoGrafico] = useState<'7' | '14'>('14')
+  const [periodoRend, setPeriodoRend] = useState<'semana' | 'mes' | '3meses'>('mes')
   const [periodoRend, setPeriodoRend] = useState<'semana' | 'mes' | '3meses'>('mes')
 
   const pipelineData = Object.entries(pipeline).map(([key, value]) => ({
