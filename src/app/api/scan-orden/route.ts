@@ -67,69 +67,7 @@ async function procesarConGoogleVision(base64: string) {
     messages: [{ role: 'user', content: `${PROMPT}\n\nTexto extraído de la orden:\n\n${textoExtraido}` }]
   })
   const text = response.content[0].type === 'text' ? response.content[0].text : ''
-  return text.replace(/```json
-?/g, '').replace(/```
-?/g, '').trim()
-}
-
-async function procesarConGoogleVisionOpenAI(base64: string) {
-  const apiKey = process.env.GOOGLE_VISION_API_KEY
-  if (!apiKey) throw new Error('GOOGLE_VISION_API_KEY no configurada')
-
-  const visionRes = await fetch(
-    `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requests: [{ image: { content: base64 }, features: [{ type: 'DOCUMENT_TEXT_DETECTION' }] }]
-      })
-    }
-  )
-  const visionData = await visionRes.json()
-  if (visionData.error) throw new Error(visionData.error.message)
-  const textoExtraido = visionData.responses?.[0]?.fullTextAnnotation?.text || ''
-  if (!textoExtraido) throw new Error('No se pudo extraer texto de la imagen')
-
-  const openaiKey = process.env.OPENAI_API_KEY
-  if (!openaiKey) throw new Error('OPENAI_API_KEY no configurada')
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      max_tokens: 1000,
-      messages: [{ role: 'user', content: `${PROMPT}
-
-Texto extraído:
-${textoExtraido}` }]
-    })
-  })
-  const data = await res.json()
-  if (data.error) throw new Error(data.error.message)
-  const text = data.choices?.[0]?.message?.content || ''
-  return text.replace(/```json
-?/g, '').replace(/```
-?/g, '').trim()
-}
-
-async function procesarConClaude(base64: string, mediaType: string) {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 2000,
-    messages: [{
-      role: 'user',
-      content: [
-        { type: 'image', source: { type: 'base64', media_type: mediaType as any, data: base64 } },
-        { type: 'text', text: PROMPT }
-      ]
-    }]
-  })
-  const text = response.content[0].type === 'text' ? response.content[0].text : ''
-  return text.replace(/```json
-?/g, '').replace(/```
-?/g, '').trim()
+  return text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
 }
 
 async function procesarConOpenAI(base64: string, mediaType: string) {
@@ -153,9 +91,7 @@ async function procesarConOpenAI(base64: string, mediaType: string) {
   const data = await res.json()
   if (data.error) throw new Error(data.error.message)
   const text = data.choices?.[0]?.message?.content || ''
-  return text.replace(/```json
-?/g, '').replace(/```
-?/g, '').trim()
+  return text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
 }
 
 export async function POST(request: NextRequest) {
