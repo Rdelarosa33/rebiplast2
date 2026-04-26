@@ -67,7 +67,9 @@ async function procesarConGoogleVision(base64: string) {
     messages: [{ role: 'user', content: `${PROMPT}\n\nTexto extraído de la orden:\n\n${textoExtraido}` }]
   })
   const text = response.content[0].type === 'text' ? response.content[0].text : ''
-  return text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+  return text.replace(/```json
+?/g, '').replace(/```
+?/g, '').trim()
 }
 
 async function procesarConGoogleVisionOpenAI(base64: string) {
@@ -125,7 +127,9 @@ async function procesarConClaude(base64: string, mediaType: string) {
     }]
   })
   const text = response.content[0].type === 'text' ? response.content[0].text : ''
-  return text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+  return text.replace(/```json
+?/g, '').replace(/```
+?/g, '').trim()
 }
 
 async function procesarConOpenAI(base64: string, mediaType: string) {
@@ -149,7 +153,9 @@ async function procesarConOpenAI(base64: string, mediaType: string) {
   const data = await res.json()
   if (data.error) throw new Error(data.error.message)
   const text = data.choices?.[0]?.message?.content || ''
-  return text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+  return text.replace(/```json
+?/g, '').replace(/```
+?/g, '').trim()
 }
 
 export async function POST(request: NextRequest) {
