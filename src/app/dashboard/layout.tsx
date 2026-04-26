@@ -11,7 +11,7 @@ import {
   ChevronLeft, ChevronRight, X, Menu
 } from 'lucide-react'
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(null)
