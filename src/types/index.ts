@@ -233,42 +233,38 @@ export function getAcciones(estado: PiezaEstado, role: UserRole, pieza?: Partial
   // TRABAJADOR — polivalente con flujo de aceptar/rechazar/terminar
   if (role === 'trabajador' || role === 'recojo_trabajador') {
 
-    // ASIGNADO — empezar trabajo (o rechazar solo si es nueva, sin historial previo)
+    // ASIGNADO — solo empezar trabajo (primer paso, no hay etapa anterior)
     if (estado === 'ASIGNADO') {
-      const esDevuelta = pieza?.historial?.some((h: any) => h.estado_nuevo === 'ASIGNADO' && h.motivo)
-      acciones.push({ label: esDevuelta ? '🔧 Empezar corrección' : '✓ Empezar trabajo', estado_nuevo: 'EN_REPARACION', color: 'btn-primary' })
-      if (!esDevuelta) {
-        acciones.push({ label: '✗ Rechazar — devolver', estado_nuevo: 'RECIBIDO', color: 'btn-danger', requiere_motivo: true })
-      }
+      acciones.push({ label: '🔧 Empezar trabajo', estado_nuevo: 'EN_REPARACION', color: 'btn-primary' })
     }
 
-    // EN_REPARACION — terminar
+    // EN_REPARACION — terminar (no puede rechazar, es el primer paso)
     if (estado === 'EN_REPARACION') {
       const siguiente = pieza?.requiere_pintura ? 'EN_PREPARACION' : 'CONTROL_CALIDAD'
-      const label = pieza?.requiere_pintura ? 'Terminado — pasar a preparación' : 'Terminado — control de calidad'
+      const label = pieza?.requiere_pintura ? '✓ Terminado — pasar a preparación' : '✓ Terminado — control de calidad'
       acciones.push({ label, estado_nuevo: siguiente, color: 'btn-primary' })
     }
 
-    // EN_PREPARACION — aceptar, rechazar (vuelve a reparación) o terminar
+    // EN_PREPARACION — terminar o rechazar (devuelve a reparación)
     if (estado === 'EN_PREPARACION') {
-      acciones.push({ label: 'Terminado — pasar a pintura', estado_nuevo: 'EN_PINTURA', color: 'btn-primary' })
-      acciones.push({ label: '✗ Rechazar — problema en reparación', estado_nuevo: 'ASIGNADO', color: 'btn-danger', requiere_motivo: true })
+      acciones.push({ label: '✓ Terminado — pasar a pintura', estado_nuevo: 'EN_PINTURA', color: 'btn-primary' })
+      acciones.push({ label: '✗ Problema en reparación — devolver', estado_nuevo: 'ASIGNADO', color: 'btn-danger', requiere_motivo: true })
     }
 
-    // EN_PINTURA — terminar o rechazar (vuelve a preparación)
+    // EN_PINTURA — terminar o rechazar (devuelve a preparación)
     if (estado === 'EN_PINTURA') {
       if (pieza?.es_faro || pieza?.requiere_pulido) {
-        acciones.push({ label: 'Terminado — pasar a pulido', estado_nuevo: 'EN_PULIDO', color: 'btn-primary' })
+        acciones.push({ label: '✓ Terminado — pasar a pulido', estado_nuevo: 'EN_PULIDO', color: 'btn-primary' })
       } else {
-        acciones.push({ label: 'Terminado — control de calidad', estado_nuevo: 'CONTROL_CALIDAD', color: 'btn-primary' })
+        acciones.push({ label: '✓ Terminado — control de calidad', estado_nuevo: 'CONTROL_CALIDAD', color: 'btn-primary' })
       }
-      acciones.push({ label: '✗ Rechazar — problema en preparación', estado_nuevo: 'EN_PREPARACION', color: 'btn-danger', requiere_motivo: true })
+      acciones.push({ label: '✗ Problema en preparación — devolver', estado_nuevo: 'EN_PREPARACION', color: 'btn-danger', requiere_motivo: true })
     }
 
-    // EN_PULIDO — terminar
+    // EN_PULIDO — terminar o rechazar (devuelve a pintura)
     if (estado === 'EN_PULIDO') {
-      acciones.push({ label: 'Terminado — control de calidad', estado_nuevo: 'CONTROL_CALIDAD', color: 'btn-primary' })
-      acciones.push({ label: '✗ Rechazar — problema en pintura', estado_nuevo: 'EN_PINTURA', color: 'btn-danger', requiere_motivo: true })
+      acciones.push({ label: '✓ Terminado — control de calidad', estado_nuevo: 'CONTROL_CALIDAD', color: 'btn-primary' })
+      acciones.push({ label: '✗ Problema en pintura — devolver', estado_nuevo: 'EN_PINTURA', color: 'btn-danger', requiere_motivo: true })
     }
   }
 
