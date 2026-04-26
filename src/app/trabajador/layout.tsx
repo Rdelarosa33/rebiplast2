@@ -34,6 +34,17 @@ export default async function DashboardLayout({ children }: { children: React.Re
     router.refresh()
   }
 
+  // Habilitacion recojo
+  let puedeRecoger = profile?.role === 'recojo' || profile?.role === 'admin' || profile?.role === 'supervisor'
+  if (profile?.role === 'trabajador') {
+    try {
+      const hoy = new Date().toISOString().split('T')[0]
+      const { data: hab } = await supabase.from('habilitaciones_recojo')
+        .select('id').eq('trabajador_id', profile.id).eq('fecha', hoy).maybeSingle()
+      puedeRecoger = !!hab
+    } catch { puedeRecoger = false }
+  }
+
   const navItems = [
     { href: '/dashboard', icon: LayoutDashboard, label: 'Inicio' },
     ...(profile?.role === 'admin' || profile?.role === 'supervisor' || profile?.role === 'recojo' || profile?.role === 'recojo_trabajador'
