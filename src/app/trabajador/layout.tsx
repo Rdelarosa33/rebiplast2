@@ -59,8 +59,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     ...(puedeRecoger
       ? [{ href: '/siniestros/nuevo', icon: Package, label: 'Recojo' }]
       : []),
+    ...(profile?.role === 'admin' || profile?.role === 'supervisor'
+      ? [{ href: '/supervisor', icon: ShieldCheck, label: 'Supervisor' }]
+      : []),
     ...(profile?.role === 'admin'
-      ? [{ href: '/admin', icon: Users, label: 'Admin' }, { href: '/admin/usuarios', icon: UserCog, label: 'Usuarios' }]
+      ? [{ href: '/admin/usuarios', icon: UserCog, label: 'Usuarios' }]
       : []),
   ]
 
