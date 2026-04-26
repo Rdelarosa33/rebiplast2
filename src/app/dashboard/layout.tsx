@@ -49,7 +49,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const navItems = [
     { href: '/dashboard', icon: LayoutDashboard, label: 'Inicio' },
-    ...(profile?.role === 'admin' || profile?.role === 'supervisor' || profile?.role === 'recojo' || profile?.role === 'recojo_trabajador'
+    ...(profile?.role === 'admin' || profile?.role === 'supervisor' || profile?.role === 'recojo' || profile?.role === 'recojo_trabajador' || profile?.role === 'owner'
       ? [{ href: '/siniestros', icon: ClipboardList, label: 'Siniestros' }]
       : []),
     { href: '/scan', icon: QrCode, label: 'Escanear' },

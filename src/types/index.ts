@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'recojo' | 'supervisor' | 'trabajador' | 'recojo_trabajador'
+export type UserRole = 'admin' | 'recojo' | 'supervisor' | 'trabajador' | 'recojo_trabajador' | 'owner'
 
 export type PiezaEstado =
   | 'REGISTRADO'
@@ -137,6 +137,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   supervisor: 'Supervisor',
   trabajador: 'Trabajador',
   recojo_trabajador: 'Recojo / Trabajador',
+  owner: 'Propietario',
 }
 
 export const ROLE_COLOR: Record<UserRole, string> = {
@@ -145,6 +146,7 @@ export const ROLE_COLOR: Record<UserRole, string> = {
   supervisor: 'bg-purple-500/20 text-purple-300',
   trabajador: 'bg-amber-500/20 text-amber-300',
   recojo_trabajador: 'bg-teal-500/20 text-teal-300',
+  owner: 'bg-yellow-500/20 text-yellow-300',
 }
 
 export const SEGUROS: SeguroTipo[] = ['RIMAC', 'PACIFICO', 'MAPFRE', 'LA_POSITIVA', 'HDI', 'INTERSEGURO', 'TALLER', 'OTRO']
