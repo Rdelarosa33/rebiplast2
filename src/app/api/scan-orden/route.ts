@@ -5,9 +5,10 @@ import { createClient as createSupabase } from '@supabase/supabase-js'
 // ================================================
 // CONFIGURACIÓN: elige qué proveedor usar
 // ================================================
-const USE_GOOGLE_VISION = true
-const USE_CLAUDE = false
-const USE_OPENAI = false
+const USE_GOOGLE_VISION = true  // OCR: extrae texto de la imagen
+const USE_CLAUDE = false         // Interpreta con Claude Haiku
+const USE_OPENAI = true          // Interpreta con GPT-4o-mini
+const USE_OPENAI_VISION = false  // OCR + interpretación todo con GPT-4o
 // ================================================
 
 const PROMPT = `Extrae datos de esta orden de trabajo de taller automotriz peruano. Responde SOLO con JSON.
@@ -69,6 +70,47 @@ async function procesarConGoogleVision(base64: string) {
   return text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
 }
 
+async function procesarConGoogleVisionOpenAI(base64: string) {
+  const apiKey = process.env.GOOGLE_VISION_API_KEY
+  if (!apiKey) throw new Error('GOOGLE_VISION_API_KEY no configurada')
+
+  const visionRes = await fetch(
+    `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requests: [{ image: { content: base64 }, features: [{ type: 'DOCUMENT_TEXT_DETECTION' }] }]
+      })
+    }
+  )
+  const visionData = await visionRes.json()
+  if (visionData.error) throw new Error(visionData.error.message)
+  const textoExtraido = visionData.responses?.[0]?.fullTextAnnotation?.text || ''
+  if (!textoExtraido) throw new Error('No se pudo extraer texto de la imagen')
+
+  const openaiKey = process.env.OPENAI_API_KEY
+  if (!openaiKey) throw new Error('OPENAI_API_KEY no configurada')
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: `${PROMPT}
+
+Texto extraído:
+${textoExtraido}` }]
+    })
+  })
+  const data = await res.json()
+  if (data.error) throw new Error(data.error.message)
+  const text = data.choices?.[0]?.message?.content || ''
+  return text.replace(/```json
+?/g, '').replace(/```
+?/g, '').trim()
+}
+
 async function procesarConClaude(base64: string, mediaType: string) {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const response = await client.messages.create({
@@ -93,7 +135,7 @@ async function procesarConOpenAI(base64: string, mediaType: string) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model: 'gpt-4o',
+      model: 'gpt-4o-mini',
       max_tokens: 2000,
       messages: [{
         role: 'user',
@@ -123,17 +165,15 @@ export async function POST(request: NextRequest) {
     let jsonText = ''
     let proveedor = ''
 
-    if (USE_GOOGLE_VISION) {
-      jsonText = await procesarConGoogleVision(base64)
-      proveedor = 'google'
-    } else if (USE_OPENAI) {
-      jsonText = await procesarConOpenAI(base64, mediaType)
-      proveedor = 'openai'
+    // Google Vision siempre hace el OCR
+    if (USE_OPENAI) {
+      jsonText = await procesarConGoogleVisionOpenAI(base64)
+      proveedor = 'google+openai'
     } else if (USE_CLAUDE) {
-      jsonText = await procesarConClaude(base64, mediaType)
-      proveedor = 'claude'
+      jsonText = await procesarConGoogleVision(base64)
+      proveedor = 'google+claude'
     } else {
-      return NextResponse.json({ error: 'No hay proveedor configurado' }, { status: 500 })
+      return NextResponse.json({ error: 'No hay intérprete configurado' }, { status: 500 })
     }
 
     const data = JSON.parse(jsonText)
