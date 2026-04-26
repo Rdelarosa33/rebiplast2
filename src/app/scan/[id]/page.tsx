@@ -125,19 +125,14 @@ export default function ScanPiezaPage({ params }: { params: { id: string } }) {
         </Link>
       )}
 
-      {/* Asignaciones */}
-      {(pieza.trabajador_reparacion_nombre || pieza.trabajador_preparacion_nombre || pieza.trabajador_pintura_nombre) && (
-        <div className="card p-4 space-y-2">
-          <p className="text-xs font-semibold text-[#475569] uppercase tracking-wider">Asignaciones</p>
-          {pieza.trabajador_reparacion_nombre && (
-            <div className="flex items-center gap-2"><User size={14} className="text-amber-400" /><span className="text-xs text-[#94A3B8]">Reparación:</span><span className="text-xs text-white">{pieza.trabajador_reparacion_nombre}</span></div>
-          )}
-          {pieza.trabajador_preparacion_nombre && (
-            <div className="flex items-center gap-2"><User size={14} className="text-orange-400" /><span className="text-xs text-[#94A3B8]">Preparación:</span><span className="text-xs text-white">{pieza.trabajador_preparacion_nombre}</span></div>
-          )}
-          {pieza.trabajador_pintura_nombre && (
-            <div className="flex items-center gap-2"><User size={14} className="text-pink-400" /><span className="text-xs text-[#94A3B8]">Pintura:</span><span className="text-xs text-white">{pieza.trabajador_pintura_nombre}</span></div>
-          )}
+      {/* Trabajador asignado */}
+      {pieza.trabajador_reparacion_nombre && (
+        <div className="card p-4">
+          <div className="flex items-center gap-2">
+            <User size={14} className="text-amber-400" />
+            <span className="text-xs text-[#94A3B8]">Asignado a:</span>
+            <span className="text-sm font-semibold text-white">{pieza.trabajador_reparacion_nombre}</span>
+          </div>
         </div>
       )}
 
@@ -154,6 +149,22 @@ export default function ScanPiezaPage({ params }: { params: { id: string } }) {
           <p className="text-sm text-red-400">{error}</p>
         </div>
       )}
+
+      {/* Banner devolucion */}
+      {(() => {
+        const rechazos = (pieza.historial || []).filter((h: any) => h.estado_nuevo === 'ASIGNADO' && h.motivo && h.usuario_nombre)
+        const rechazo = rechazos.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+        if (!rechazo) return null
+        const ultimaAprobacion = (pieza.historial || []).filter((h: any) => h.estado_nuevo === 'LISTO_ENTREGA')
+          .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+        if (ultimaAprobacion && new Date(ultimaAprobacion.created_at) > new Date(rechazo.created_at)) return null
+        return (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+            <p className="text-sm font-semibold text-red-400 mb-1">⚠ Devuelta por {rechazo.usuario_nombre}</p>
+            <p className="text-sm text-[#94A3B8]">"{rechazo.motivo}"</p>
+          </div>
+        )
+      })()}
 
       {/* Acciones */}
       {profile && (
