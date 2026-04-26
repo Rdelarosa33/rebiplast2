@@ -27,7 +27,6 @@ export default function DashboardAdminClient({
 }: any) {
   const [periodoGrafico, setPeriodoGrafico] = useState<'7' | '14'>('14')
   const [periodoRend, setPeriodoRend] = useState<'semana' | 'mes' | '3meses'>('mes')
-  const [periodoRend, setPeriodoRend] = useState<'semana' | 'mes' | '3meses'>('mes')
 
   const pipelineData = Object.entries(pipeline).map(([key, value]) => ({
     name: PIPELINE_LABELS[key],
