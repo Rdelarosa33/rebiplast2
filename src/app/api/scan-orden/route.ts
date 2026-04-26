@@ -161,3 +161,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message || 'Error al procesar' }, { status: 500 })
   }
 }
+ 
