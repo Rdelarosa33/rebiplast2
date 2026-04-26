@@ -217,9 +217,14 @@ export default function MisPiezasClient({ profile, piezasActivas, piezasTerminad
               </div>
             ) : (
               terminadasFiltradas.map((p: any) => {
-                const fueDevuelta = p.historial?.some((h: any) => h.estado_nuevo === 'ASIGNADO' && h.motivo)
+                // Solo marcar devuelta si el rechazo fue DESPUES del ultimo avance a calidad
+                const rechazos = p.historial?.filter((h: any) => h.estado_nuevo === 'ASIGNADO' && h.motivo) || []
+                const ultimoRechazo = rechazos.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+                const ultimaAprobacion = p.historial?.filter((h: any) => h.estado_nuevo === 'LISTO_ENTREGA')
+                  .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+                const fueDevuelta = ultimoRechazo && (!ultimaAprobacion || new Date(ultimoRechazo.created_at) > new Date(ultimaAprobacion.created_at))
                 return (
-                  <div key={p.id} className={`card p-3 flex items-center gap-3 ${fueDevuelta ? 'border-red-500/20' : 'border-green-500/20'}`}>
+                  <Link key={p.id} href={`/scan/${p.id}`} className={`card p-3 flex items-center gap-3 ${fueDevuelta ? 'border-red-500/20' : 'border-green-500/20'} hover:border-[#00D4FF]/30 transition-colors`}>
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${fueDevuelta ? 'bg-red-500/20' : 'bg-green-500/20'}`}>
                       {fueDevuelta ? <XCircle size={14} className="text-red-400" /> : <CheckCircle size={14} className="text-green-400" />}
                     </div>
@@ -230,10 +235,13 @@ export default function MisPiezasClient({ profile, piezasActivas, piezasTerminad
                       </p>
                       <p className="text-xs text-[#2D3F55] font-mono">{p.qr_code}</p>
                     </div>
-                    <span className={`text-xs badge flex-shrink-0 ${fueDevuelta ? 'bg-red-500/20 text-red-300 border-red-500/30' : 'bg-green-500/20 text-green-300 border-green-500/30'}`}>
-                      {fueDevuelta ? 'Devuelta' : '✓ OK'}
-                    </span>
-                  </div>
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                      <span className={`text-xs badge ${fueDevuelta ? 'bg-red-500/20 text-red-300 border-red-500/30' : 'bg-green-500/20 text-green-300 border-green-500/30'}`}>
+                        {fueDevuelta ? 'Devuelta' : '✓ OK'}
+                      </span>
+                      <ChevronRight size={12} className="text-[#2D3F55]" />
+                    </div>
+                  </Link>
                 )
               })
             )}
