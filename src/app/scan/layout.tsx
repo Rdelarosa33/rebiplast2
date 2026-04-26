@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Profile, ROLE_LABELS, ROLE_COLOR } from '@/types'
 import {
-  LayoutDashboard, ClipboardList, QrCode, Users,
+  LayoutDashboard, ClipboardList, QrCode, Users, UserCog,
   LogOut, Wrench, ShieldCheck, Hammer, Package,
   ChevronLeft, ChevronRight, X, Menu
 } from 'lucide-react'
