@@ -34,12 +34,14 @@ export default function UsuariosClient({ usuarios }: { usuarios: Usuario[] }) {
   const [editNombre, setEditNombre] = useState('')
   const [editApellido, setEditApellido] = useState('')
   const [editRol, setEditRol] = useState<UserRole>('trabajador')
+  const [editPassword, setEditPassword] = useState('')
 
   const abrirEditar = (u: Usuario) => {
     setModalEditar(u)
     setEditNombre(u.nombre)
     setEditApellido(u.apellido)
     setEditRol(u.role)
+    setEditPassword('')
     setError('')
   }
 
@@ -57,12 +59,20 @@ export default function UsuariosClient({ usuarios }: { usuarios: Usuario[] }) {
     if (!modalEditar || !editNombre) return
     setLoading(true)
     setError('')
-    const supabase = createClient()
-    const { error } = await supabase.from('profiles')
-      .update({ nombre: editNombre, apellido: editApellido, role: editRol })
-      .eq('id', modalEditar.id)
-    if (error) {
-      setError(error.message)
+    const res = await fetch('/api/admin/crear-usuario', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: modalEditar.id,
+        nombre: editNombre,
+        apellido: editApellido,
+        role: editRol,
+        ...(editPassword ? { password: editPassword } : {})
+      })
+    })
+    const data = await res.json()
+    if (data.error) {
+      setError(data.error)
     } else {
       setLista(prev => prev.map(w => w.id === modalEditar.id
         ? { ...w, nombre: editNombre, apellido: editApellido, role: editRol }
@@ -228,6 +238,11 @@ export default function UsuariosClient({ usuarios }: { usuarios: Usuario[] }) {
                   </select>
                   <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#475569] pointer-events-none" />
                 </div>
+              </div>
+              <div>
+                <label className="label">Nueva contraseña (opcional)</label>
+                <input value={editPassword} onChange={e => setEditPassword(e.target.value)}
+                  className="input-field" placeholder="Dejar vacío para no cambiar" type="text" />
               </div>
               <p className="text-xs text-[#475569]">Email: {modalEditar.email}</p>
               {error && <p className="text-xs text-red-400">{error}</p>}
