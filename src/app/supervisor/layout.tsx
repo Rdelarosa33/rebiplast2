@@ -11,7 +11,7 @@ import {
   ChevronLeft, ChevronRight, X, Menu
 } from 'lucide-react'
 
-export default function DashboardLayout({ children, habilitadoRecojo = false }: { children: React.ReactNode, habilitadoRecojo?: boolean }) {
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -34,7 +34,18 @@ export default function DashboardLayout({ children, habilitadoRecojo = false }: 
     router.refresh()
   }
 
-  const puedeRecoger = profile?.role === 'recojo' || profile?.role === 'admin' || profile?.role === 'supervisor' || profile?.role === 'recojo_trabajador' || habilitadoRecojo
+  const [puedeRecoger, setPuedeRecoger] = useState(
+    profile?.role === 'recojo' || profile?.role === 'admin' || profile?.role === 'supervisor'
+  )
+
+  useEffect(() => {
+    if (profile?.role !== 'trabajador') return
+    const supabase = createClient()
+    const hoy = new Date().toISOString().split('T')[0]
+    supabase.from('habilitaciones_recojo')
+      .select('id').eq('trabajador_id', profile.id).eq('fecha', hoy).maybeSingle()
+      .then(({ data }) => setPuedeRecoger(!!data))
+  }, [profile?.id, profile?.role])
 
   const navItems = [
     { href: '/dashboard', icon: LayoutDashboard, label: 'Inicio' },
