@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const PROMPT = `Extrae datos de una orden de trabajo automotriz peruana.
+const PROMPT = `Lee esta orden de trabajo automotriz peruana.
 
-Devuelve SOLO JSON válido.
+Primero identifica visualmente todos los datos que puedas ver.
+Luego devuelve SOLO JSON válido.
 
-========================
-CAMPOS OBLIGATORIOS
-========================
+Campos obligatorios:
 numero_siniestro
 numero_orden
 marca
@@ -17,101 +16,21 @@ taller_origen
 color
 piezas
 
-========================
-DETECTAR SEGURO
-========================
-- RIMAC → si aparece RIMAC
-- MAPFRE → si aparece MAPFRE
-- PACIFICO → si aparece Pacífico o EA Corp
-- LA_POSITIVA → si aparece La Positiva
-- INTERSEGURO → si aparece Qualitat, Interseguro
-- OTRO → si no
+Reglas:
+- tipo_seguro: RIMAC, MAPFRE, PACIFICO, LA_POSITIVA, INTERSEGURO, HDI, TALLER u OTRO.
+- nombre_girador: buscar cerca de Técnico, Perito, Asesor, Ajustador, Inspector, Responsable, Autorizado, VoBo, Realizado por, Nombre Usuario o firma.
+- taller_origen: buscar en TALLER PRINCIPAL, ATENCIÓN A TALLER, Cliente, Sede, a los señores, Dirección Taller, Razón Social Proveedor.
+- No usar REIBPLAST como taller_origen si es receptor.
+- piezas: extraer cada pieza o servicio por separado.
+- REP, REPARA, REPARAR, REPARACIÓN = reparación.
+- PINTURA, PINTAR, RP = pintura.
+- FARO, NEBLINERO, LUZ = es_faro.
+- PULIDO = requiere_pulido.
+- LH/IZQ = Izquierdo; RH/DER = Derecho; DEL/DELT = Frontal; POST = Posterior.
+- Si es faro y no dice cambio/reemplazo/sustitución, requiere_pulido=true.
+- Si no sabes un dato, usa null.
 
-========================
-NUMERO ORDEN
-========================
-Buscar:
-- NRO DE OC
-- ORDEN DE TRABAJO
-- OC-
-- NumOS
-
-========================
-SINIESTRO
-========================
-Buscar:
-- Siniestro
-- Caso
-
-========================
-PLACA / MARCA / COLOR
-========================
-Buscar directamente en el documento
-
-========================
-GIRADOR (PRIORIDAD)
-========================
-Buscar nombre junto a:
-
-1. Técnico
-2. Realizado por
-3. Asesor
-4. Inspector
-5. Jefe de Taller
-6. Autorizado
-7. VoBo
-8. Firma con nombre debajo
-
-Tomar el nombre más claro.
-
-========================
-TALLER_ORIGEN (CRÍTICO)
-========================
-
-Buscar en este orden de prioridad:
-
-1. "TALLER PRINCIPAL"
-2. "ATENCIÓN A TALLER"
-3. "Cliente"
-4. Texto después de "a los señores"
-5. "Dirección Taller"
-6. Nombre de empresa en firma inferior
-7. "Razón Social Proveedor" (solo si no hay otro)
-
-REGLAS:
-- IGNORAR "REIBPLAST" (es receptor)
-- Elegir el taller que envía el trabajo
-- Si hay persona + empresa → elegir empresa
-
-========================
-EXTRACCIÓN DE PIEZAS
-========================
-
-Extrae cada pieza por separado desde la sección de trabajos.
-
-Para cada pieza:
-
-- nombre: texto limpio de la pieza
-- requiere_reparacion: true si contiene REP, REPARAR, REPARACIÓN
-- requiere_pintura: true si menciona pintura o RP
-- es_faro: true si contiene FARO, NEBLINERO o LUZ
-- requiere_pulido: true si es_faro y NO indica reemplazo
-
-REGLAS:
-- Cada línea es una pieza distinta
-- No agrupar piezas
-- Ignorar subtotales, totales, IGV
-
-========================
-REGLAS GENERALES
-========================
-- No inventar datos
-- Si no estás seguro → null
-
-========================
-FORMATO JSON
-========================
-
+JSON:
 {
   "numero_siniestro": null,
   "numero_orden": null,
@@ -124,10 +43,12 @@ FORMATO JSON
   "piezas": [
     {
       "nombre": "",
-      "requiere_reparacion": true,
+      "lado": "N/A",
+      "requiere_reparacion": false,
       "requiere_pintura": false,
       "es_faro": false,
-      "requiere_pulido": false
+      "requiere_pulido": false,
+      "tipo_trabajo": null
     }
   ]
 }`
@@ -216,4 +137,5 @@ export async function POST(request: NextRequest) {
     )
   }
 } 
+ 
  
