@@ -70,7 +70,7 @@ REGLAS:
   - Interseguro
 
 - NUNCA usar:
-  - Rebiplast
+  - Rebiplast ni frase que lo contenga
   - Rafael Gonzales
 
 - Elegir empresa/taller, no persona
