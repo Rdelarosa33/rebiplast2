@@ -180,7 +180,7 @@ export default function NuevoSiniestroPage() {
       nombre_asegurado: '', telefono_asegurado: '',
       tipo_seguro: 'MAPFRE', nombre_girador: '',
       taller_origen: '', fecha_recojo: new Date().toISOString().split('T')[0],
-      hora_recojo: new Date().toTimeString().slice(0,5), fecha_entrega_estimada: '', observaciones: '', monto_total: '', moneda: 'USD', monto_total: '', moneda: 'USD'
+      hora_recojo: new Date().toTimeString().slice(0,5), fecha_entrega_estimada: '', observaciones: '', monto_total: '', moneda: 'USD'
     })
     setPiezas([{ ...PIEZA_VACIA }])
   }
