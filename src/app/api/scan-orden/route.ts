@@ -2,14 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient as createSupabase } from '@supabase/supabase-js'
 
-// ================================================
-// Google Vision siempre hace el OCR
-// Solo cambia el intérprete:
-// ================================================
-const USE_OPENAI = true   // Interpreta con GPT-4o-mini
-const USE_CLAUDE = false  // Interpreta con Claude Haiku
-// ================================================
-
 const PROMPT = `Extrae datos de esta orden de trabajo de taller automotriz peruano. Responde SOLO con JSON.
 
 SEGUROS: RIMAC, MAPFRE, PACIFICO(o EA Corp), LA_POSITIVA, HDI, INTERSEGURO(o Qualität), TALLER, OTRO
@@ -45,56 +37,6 @@ function limpiarJSON(text: string): string {
   return text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
 }
 
-async function extraerTextoConVision(base64: string): Promise<string> {
-  const apiKey = process.env.GOOGLE_VISION_API_KEY
-  if (!apiKey) throw new Error('GOOGLE_VISION_API_KEY no configurada')
-
-  const visionRes = await fetch(
-    `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requests: [{ image: { content: base64 }, features: [{ type: 'DOCUMENT_TEXT_DETECTION' }] }]
-      })
-    }
-  )
-  const visionData = await visionRes.json()
-  if (visionData.error) throw new Error(visionData.error.message)
-  const texto = visionData.responses?.[0]?.fullTextAnnotation?.text || ''
-  if (!texto) throw new Error('No se pudo extraer texto de la imagen')
-  return texto
-}
-
-async function interpretarConOpenAI(texto: string): Promise<string> {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) throw new Error('OPENAI_API_KEY no configurada')
-
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      max_tokens: 1000,
-      messages: [{ role: 'user', content: `${PROMPT}\n\nTexto extraído:\n${texto}` }]
-    })
-  })
-  const data = await res.json()
-  if (data.error) throw new Error(data.error.message)
-  return limpiarJSON(data.choices?.[0]?.message?.content || '')
-}
-
-async function interpretarConClaude(texto: string): Promise<string> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 1000,
-    messages: [{ role: 'user', content: `${PROMPT}\n\nTexto extraído:\n${texto}` }]
-  })
-  const text = response.content[0].type === 'text' ? response.content[0].text : ''
-  return limpiarJSON(text)
-}
-
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
@@ -104,23 +46,45 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer()
     const base64 = Buffer.from(bytes).toString('base64')
 
-    // Paso 1: OCR con Google Vision
-    const textoExtraido = await extraerTextoConVision(base64)
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) throw new Error('OPENAI_API_KEY no configurada')
 
-    // Paso 2: Interpretar con el modelo seleccionado
-    let jsonText = ''
-    let proveedor = ''
+    // GPT-4o-mini lee la imagen directamente
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        max_tokens: 1200,
+        temperature: 0,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image_url',
+                image_url: {
+                  url: `data:${file.type};base64,${base64}`,
+                  detail: 'high'
+                }
+              },
+              {
+                type: 'text',
+                text: PROMPT
+              }
+            ]
+          }
+        ]
+      })
+    })
 
-    if (USE_OPENAI) {
-      jsonText = await interpretarConOpenAI(textoExtraido)
-      proveedor = 'google+openai'
-    } else if (USE_CLAUDE) {
-      jsonText = await interpretarConClaude(textoExtraido)
-      proveedor = 'google+claude'
-    } else {
-      return NextResponse.json({ error: 'No hay intérprete configurado' }, { status: 500 })
-    }
+    const result = await res.json()
+    if (result.error) throw new Error(result.error.message)
 
+    const jsonText = limpiarJSON(result.choices?.[0]?.message?.content || '')
     const data = JSON.parse(jsonText)
 
     // Registrar uso y descontar credito
@@ -152,7 +116,7 @@ export async function POST(request: NextRequest) {
       console.error('Error registrando uso OCR:', e)
     }
 
-    return NextResponse.json({ success: true, data, proveedor })
+    return NextResponse.json({ success: true, data, proveedor: 'gpt-4o-mini' })
 
   } catch (error: any) {
     console.error('Error scan-orden:', error)
