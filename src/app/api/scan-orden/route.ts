@@ -103,57 +103,26 @@ function matchConLista(candidatos: string[], registros: any[], campoNombre: stri
 // ============================================================
 // PROMPT — solo campos que GPT extrae bien
 // ============================================================
-const PROMPT = `Lee esta orden de trabajo automotriz peruana.
-Devuelve SOLO JSON válido.
+const PROMPT = `Lee esta orden de trabajo automotriz peruana. Devuelve SOLO JSON válido.
 
-CAMPOS:
-- numero_siniestro: buscar Siniestro/Caso/SINIESTRO
-- datos_extra (capturar si existen):
-  expediente, poliza, modelo, anio, vin/chasis, nombre_asegurado, telefono_asegurado
-  observaciones_orden: texto del campo Observaciones de la orden
-- numero_orden: buscar NRO DE OC/ORDEN DE TRABAJO/OC-/NumOS/N°/Folio
-- marca, placa (formato ABC123 o ABC1234), color
-- tipo_seguro: RIMAC/MAPFRE/PACIFICO/LA_POSITIVA/HDI/INTERSEGURO/TALLER/OTRO
-- nombre_girador: nombre junto a Tecnico/Perito/Asesor/Realizado por/VoBo/firma
-- taller_origen: buscar en este orden:
-  1. Campo "TALLER PRINCIPAL" → usar el valor, no el label
-  2. Campo "Cliente:" → usar el valor (ej: "Alpiconsult S.A.C.")
-  3. Campo "ATENCION A TALLER" → usar el valor, no el label
-  4. "a los señores [nombre]" → usar el nombre
-  5. Empresa en firma inferior
-  NUNCA usar: REBIPLAST, "ATENCION A TALLER" como texto, "TALLER PRINCIPAL" como texto
-  SIEMPRE extraer el VALOR del campo, no el nombre del campo
+CAMPOS: numero_siniestro(Siniestro/Caso), numero_orden(NRO DE OC/NumOS/N°/OC-/Folio), marca, placa(ABC123 o ABC1234), color
+tipo_seguro: RIMAC/MAPFRE/PACIFICO/LA_POSITIVA/HDI/INTERSEGURO/TALLER/OTRO
+nombre_girador: nombre junto a Tecnico/Perito/Asesor/Realizado por/VoBo/firma
+taller_origen: extraer el VALOR (no el label) de: Cliente > TALLER PRINCIPAL > ATENCION A TALLER > "a los señores" > firma empresa. NUNCA usar REBIPLAST.
+datos_extra: expediente, poliza, modelo, anio, vin, nombre_asegurado, telefono_asegurado, observaciones_orden
 
-CANDIDATOS - meter todo lo que veas aunque no estés seguro:
-- candidatos.seguros: logos/nombres de seguros visibles
-- candidatos.giradores: nombres de personas visibles
-- candidatos.talleres: nombres de talleres/empresas (excepto REBIPLAST)
+CANDIDATOS (todo lo que veas aunque no estés seguro):
+candidatos.seguros, candidatos.giradores, candidatos.talleres(excepto REBIPLAST)
 
-PIEZAS - CADA linea = UNA pieza separada, NO agrupar:
-MAPFRE: cada linea REP = pieza independiente
-RIMAC: cada fila descripcion/SERVICIO = una pieza
-LA_POSITIVA: tabla Reparacion/Descripcion, cada fila = una pieza
-PACIFICO/EA Corp: tabla OPERACION/DESCRIPCION, cada fila = una pieza
-INTERSEGURO/QUALITAT (MUY IMPORTANTE):
-- Las piezas NO están en la tabla de montos (Planchado/Pintura/Terceros/Mecanica son categorias, NO piezas)
-- Las piezas están SOLO en el campo "Observaciones"
-- Ejemplo: "OT POR REPUESTO : FUNDA POST SUP" → pieza = "FUNDA POST SUP"
-- Separar por coma, guion, salto de linea o punto y coma si hay varias
+PIEZAS - cada linea = UNA pieza, NO agrupar. Revisar siempre Observaciones para piezas adicionales.
+MAPFRE: cada "REP xxx" = pieza separada
+RIMAC: cada fila descripcion/SERVICIO = pieza
+LA_POSITIVA: cada fila tabla Reparacion/Descripcion = pieza
+PACIFICO/EA Corp: cada fila OPERACION/DESCRIPCION = pieza
+INTERSEGURO/QUALITAT: piezas SOLO en Observaciones (ej: "OT POR REPUESTO: FUNDA POST SUP" → pieza="FUNDA POST SUP"). Ignorar tabla de montos.
 
-Campos por pieza:
-- nombre, lado (LH=Izquierdo/RH=Derecho/DELT=Frontal/POST=Posterior/N/A)
-- requiere_reparacion (REP/REPARA), requiere_pintura (PINTURA/RP)
-- es_faro (FARO/NEBLINERO), requiere_pulido (PULIDO o faro sin cambio)
-- tipo_trabajo: RP/R/P/PU
-
-Ignorar: SUBTOTAL, IGV, TOTAL, filas vacias.
-
-OBSERVACIONES (SIEMPRE REVISAR):
-- Contiene informacion critica: piezas adicionales, trabajos especiales
-- Si hay piezas en Observaciones que no aparecen en la tabla, agregarlas
-- INTERSEGURO/QUALITAT: las piezas estan SOLO en Observaciones
-- Formato tipico: "OT POR REPUESTO : FUNDA POST SUP" → pieza = "FUNDA POST SUP"
-- Separar multiples piezas por coma, guion, salto de linea
+Campos pieza: nombre, lado(LH=Izquierdo/RH=Derecho/DELT=Frontal/POST=Posterior/N/A), requiere_reparacion(REP), requiere_pintura(PINTURA/RP), es_faro(FARO/NEBLINERO), requiere_pulido(PULIDO/faro sin cambio), tipo_trabajo(R/P/RP/PU)
+Ignorar: SUBTOTAL, IGV, TOTAL, Planchado/Pintura/Mecanica como categorias de monto.
 
 {"numero_siniestro":null,"numero_orden":null,"marca":null,"placa":null,"color":null,"tipo_seguro":null,"nombre_girador":null,"taller_origen":null,"texto_completo":null,"datos_extra":{"expediente":null,"poliza":null,"modelo":null,"anio":null,"vin":null,"nombre_asegurado":null,"telefono_asegurado":null,"observaciones_orden":null},"candidatos":{"seguros":[],"giradores":[],"talleres":[]},"piezas":[{"nombre":"","lado":"N/A","requiere_reparacion":false,"requiere_pintura":false,"es_faro":false,"requiere_pulido":false,"tipo_trabajo":null}]}`
 
