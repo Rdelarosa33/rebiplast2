@@ -146,6 +146,8 @@ export async function crearSiniestro(formData: FormData) {
       hora_recojo: formData.get('hora_recojo'),
       fecha_entrega_estimada: formData.get('fecha_entrega_estimada') || null,
       observaciones: formData.get('observaciones') || null,
+      monto_total: formData.get('monto_total') ? parseFloat(formData.get('monto_total') as string) : null,
+      moneda: formData.get('moneda') || 'USD',
       responsable_recojo_id: user.id,
       responsable_recojo_nombre: profile ? `${profile.nombre} ${profile.apellido}`.trim() : '',
     })

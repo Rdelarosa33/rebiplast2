@@ -17,6 +17,8 @@ interface PiezaForm {
   tipo_trabajo: string
   precio: string
   observaciones: string
+  monto_total: string
+  moneda: string
 }
 
 const PIEZA_VACIA: PiezaForm = {
@@ -45,7 +47,7 @@ export default function NuevoSiniestroPage() {
     nombre_asegurado: '', telefono_asegurado: '',
     tipo_seguro: 'MAPFRE', nombre_girador: '',
     taller_origen: '', fecha_recojo: new Date().toISOString().split('T')[0],
-    hora_recojo: new Date().toTimeString().slice(0,5), fecha_entrega_estimada: '', observaciones: ''
+    hora_recojo: new Date().toTimeString().slice(0,5), fecha_entrega_estimada: '', observaciones: '', monto_total: '', moneda: 'USD'
   })
 
   const [piezas, setPiezas] = useState<PiezaForm[]>([{ ...PIEZA_VACIA }])
@@ -118,6 +120,8 @@ export default function NuevoSiniestroPage() {
         fecha_recojo: prev.fecha_recojo, // siempre fecha real
         hora_recojo: prev.hora_recojo,
         observaciones: d.observaciones || prev.observaciones,
+        monto_total: d.monto_total ? String(d.monto_total) : prev.monto_total,
+        moneda: d.moneda || prev.moneda || 'USD',
       }))
       if (d.piezas && d.piezas.length > 0) {
         setPiezas(d.piezas.map((p: any) => ({
@@ -178,7 +182,7 @@ export default function NuevoSiniestroPage() {
       nombre_asegurado: '', telefono_asegurado: '',
       tipo_seguro: 'MAPFRE', nombre_girador: '',
       taller_origen: '', fecha_recojo: new Date().toISOString().split('T')[0],
-      hora_recojo: new Date().toTimeString().slice(0,5), fecha_entrega_estimada: '', observaciones: ''
+      hora_recojo: new Date().toTimeString().slice(0,5), fecha_entrega_estimada: '', observaciones: '', monto_total: '', moneda: 'USD', monto_total: '', moneda: 'USD'
     })
     setPiezas([{ ...PIEZA_VACIA }])
   }
@@ -341,6 +345,16 @@ export default function NuevoSiniestroPage() {
                 <input className="input-field" type="time" value={form.hora_recojo} onChange={e => setForm({...form, hora_recojo: e.target.value})} /></div>
               <div className="col-span-2"><label className="label">Observaciones</label>
                 <textarea className="input-field" rows={2} value={form.observaciones} onChange={e => setForm({...form, observaciones: e.target.value})} /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="label">Monto Total</label>
+                <input className="input-field" type="number" step="0.01" placeholder="0.00"
+                  value={form.monto_total} onChange={e => setForm({...form, monto_total: e.target.value})} /></div>
+                <div><label className="label">Moneda</label>
+                <select className="input-field" value={form.moneda} onChange={e => setForm({...form, moneda: e.target.value})}>
+                  <option value="USD">USD ($)</option>
+                  <option value="PEN">PEN (S/)</option>
+                </select></div>
+              </div>
             </div>
           </div>
 
