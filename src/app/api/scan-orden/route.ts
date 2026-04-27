@@ -124,7 +124,11 @@ MAPFRE: cada linea REP = pieza independiente
 RIMAC: cada fila descripcion/SERVICIO = una pieza
 LA_POSITIVA: tabla Reparacion/Descripcion, cada fila = una pieza
 PACIFICO/EA Corp: tabla OPERACION/DESCRIPCION, cada fila = una pieza
-INTERSEGURO: piezas en Observaciones, separar por coma/guion/salto
+INTERSEGURO/QUALITAT (MUY IMPORTANTE):
+- Las piezas NO están en la tabla de montos (Planchado/Pintura/Terceros/Mecanica son categorias, NO piezas)
+- Las piezas están SOLO en el campo "Observaciones"
+- Ejemplo: "OT POR REPUESTO : FUNDA POST SUP" → pieza = "FUNDA POST SUP"
+- Separar por coma, guion, salto de linea o punto y coma si hay varias
 
 Campos por pieza:
 - nombre, lado (LH=Izquierdo/RH=Derecho/DELT=Frontal/POST=Posterior/N/A)
