@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const PROMPT = `Extrae datos de una orden de trabajo automotriz peruana.
 
+El texto puede venir desordenado. Interprétalo.
+
 Devuelve SOLO JSON válido.
 
 ========================
@@ -67,40 +69,67 @@ Tomar el nombre más claro.
 ========================
 TALLER_ORIGEN (CRÍTICO)
 ========================
+Buscar en este orden:
 
-Buscar en este orden de prioridad:
-
-1. "TALLER PRINCIPAL"
-2. "ATENCIÓN A TALLER"
-3. "Cliente"
+1. TALLER PRINCIPAL
+2. ATENCIÓN A TALLER
+3. Cliente
 4. Texto después de "a los señores"
-5. "Dirección Taller"
+5. Dirección Taller
 6. Nombre de empresa en firma inferior
-7. "Razón Social Proveedor" (solo si no hay otro)
+7. Razón Social Proveedor (solo si no hay otro)
 
 REGLAS:
-- IGNORAR "REIBPLAST" (es receptor)
-- Elegir el taller que envía el trabajo
+- IGNORAR "REIBPLAST"
+- Elegir taller que envía el trabajo
 - Si hay persona + empresa → elegir empresa
 
 ========================
-EXTRACCIÓN DE PIEZAS
+EXTRACCIÓN DE PIEZAS (ROBUSTA)
 ========================
 
-Extrae cada pieza por separado desde la sección de trabajos.
+Busca secciones de trabajos, servicios o repuestos.
+
+Cada fila o línea representa una pieza.
 
 Para cada pieza:
 
-- nombre: texto limpio de la pieza
-- requiere_reparacion: true si contiene REP, REPARAR, REPARACIÓN
-- requiere_pintura: true si menciona pintura o RP
-- es_faro: true si contiene FARO, NEBLINERO o LUZ
-- requiere_pulido: true si es_faro y NO indica reemplazo
+1. nombre:
+   - usar el texto más descriptivo
+   - puede venir de "Descripción" u otro campo
+   - si es corto (ej: "inf"), combinar con texto cercano
+
+2. lado:
+   - LH, IZQ → Izquierdo
+   - RH, DER → Derecho
+   - DEL, DELT → Frontal
+   - POST → Posterior
+   - si no → "N/A"
+
+3. requiere_reparacion:
+   - REP, REPARA, REPARAR, REPARACIÓN
+
+4. requiere_pintura:
+   - PINTURA, PINTAR, RP
+
+5. es_faro:
+   - FARO, NEBLINERO, LUZ
+
+6. requiere_pulido:
+   - si dice PULIDO → true
+   - si es_faro y no dice cambio/reemplazo → true
+
+7. tipo_trabajo:
+   - RP → reparación + pintura
+   - R → solo reparación
+   - P → solo pintura
+   - PU → solo pulido
 
 REGLAS:
-- Cada línea es una pieza distinta
+- Cada línea es una pieza independiente
 - No agrupar piezas
-- Ignorar subtotales, totales, IGV
+- Ignorar SUBTOTAL, IGV, TOTAL
+- No depender de nombres de columnas exactos
 
 ========================
 REGLAS GENERALES
@@ -124,10 +153,12 @@ FORMATO JSON
   "piezas": [
     {
       "nombre": "",
+      "lado": "N/A",
       "requiere_reparacion": true,
       "requiere_pintura": false,
       "es_faro": false,
-      "requiere_pulido": false
+      "requiere_pulido": false,
+      "tipo_trabajo": "R"
     }
   ]
 }`
@@ -216,3 +247,4 @@ export async function POST(request: NextRequest) {
     )
   }
 } 
+ 
