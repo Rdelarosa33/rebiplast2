@@ -1,17 +1,14 @@
+````ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createSupabase } from '@supabase/supabase-js'
 
 // ================================================
-// CONFIG
+// PROMPT (ANTIGUO OPTIMIZADO PARA OCR)
 // ================================================
-const USE_GOOGLE_VISION = true
-const USE_OPENAI = true
-// ================================================
+const PROMPT = `Eres un experto en leer órdenes de trabajo de talleres automotrices peruanos.
+El texto puede venir desordenado por OCR. Interprétalo aunque esté mal alineado.
 
-// 🔥 PROMPT OPTIMIZADO (corto)
-const PROMPT = `Extrae datos de una orden automotriz peruana desde texto OCR.
-
-Responde SOLO JSON.
+Responde SOLO JSON válido.
 
 SEGURO:
 RIMAC, MAPFRE, LA_POSITIVA, PACIFICO, INTERSEGURO, HDI, TALLER.
@@ -36,7 +33,7 @@ PINTURA o RP → pintura
 ambos → "RP", si no → "R"
 
 LADOS:
-LH=Izq, RH=Der, DELT=Front, POST=Post
+LH=Izquierdo, RH=Derecho, DELT=Frontal, POST=Posterior
 
 Ignorar totales e IGV.
 Si dudas → null.
@@ -64,7 +61,7 @@ JSON:
 }`
 
 // ================================================
-// OCR GOOGLE (solo texto)
+// OCR GOOGLE (SIN RECORTE)
 // ================================================
 async function extraerTextoGoogleVision(base64: string) {
   const apiKey = process.env.GOOGLE_VISION_API_KEY
@@ -89,26 +86,24 @@ async function extraerTextoGoogleVision(base64: string) {
   const texto = data.responses?.[0]?.fullTextAnnotation?.text || ''
   if (!texto) throw new Error('OCR vacío')
 
-  // 🔥 RECORTE CLAVE (AHORRO $$$)
-  return texto.slice(0, 4000)
+  console.log("OCR TEXTO:", texto) // 🔥 DEBUG
+
+  return texto // 🔥 SIN RECORTE
 }
 
 // ================================================
-// OPENAI (interpretación barata)
+// OPENAI TEXTO
 // ================================================
 async function interpretarConOpenAI(texto: string) {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) throw new Error('Falta OPENAI_API_KEY')
-
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
     },
     body: JSON.stringify({
       model: 'gpt-4o-mini',
-      max_tokens: 800, // 🔥 reducido
+      max_tokens: 800,
       messages: [
         {
           role: 'user',
@@ -119,26 +114,62 @@ async function interpretarConOpenAI(texto: string) {
   })
 
   const data = await res.json()
-
   if (data.error) throw new Error(data.error.message)
 
-  const text = data.choices?.[0]?.message?.content || ''
-
-  return text
-    .replace(/```json\n?/g, '')
-    .replace(/```\n?/g, '')
-    .trim()
+  return data.choices?.[0]?.message?.content || ''
 }
 
 // ================================================
-// JSON seguro
+// OPENAI VISIÓN (FALLBACK)
+// ================================================
+async function procesarConOpenAIVision(base64: string, mediaType: string) {
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      max_tokens: 800,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:${mediaType};base64,${base64}`,
+                detail: 'high'
+              }
+            },
+            {
+              type: 'text',
+              text: PROMPT
+            }
+          ]
+        }
+      ]
+    })
+  })
+
+  const data = await res.json()
+  if (data.error) throw new Error(data.error.message)
+
+  return data.choices?.[0]?.message?.content || ''
+}
+
+// ================================================
+// JSON SEGURO
 // ================================================
 function parseSeguro(text: string) {
   try {
-    return JSON.parse(text)
+    return JSON.parse(
+      text.replace(/```json/g, '').replace(/```/g, '').trim()
+    )
   } catch {
-    console.error('JSON inválido:', text)
-    throw new Error('IA no devolvió JSON válido')
+    console.error("JSON inválido:", text)
+    throw new Error("IA no devolvió JSON válido")
   }
 }
 
@@ -157,13 +188,25 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer()
     const base64 = Buffer.from(bytes).toString('base64')
 
-    // 🔹 OCR
+    let data
+
+    // 1️⃣ OCR + IA
     const textoOCR = await extraerTextoGoogleVision(base64)
+    let jsonText = await interpretarConOpenAI(textoOCR)
 
-    // 🔹 IA
-    const jsonText = await interpretarConOpenAI(textoOCR)
+    try {
+      data = parseSeguro(jsonText)
+    } catch {
+      data = {}
+    }
 
-    const data = parseSeguro(jsonText)
+    // 2️⃣ FALLBACK si falla
+    if (!data.numero_orden && !data.placa) {
+      console.log("⚠️ Fallback a visión directa")
+
+      jsonText = await procesarConOpenAIVision(base64, file.type)
+      data = parseSeguro(jsonText)
+    }
 
     // ============================================
     // 💰 COBRO
@@ -209,10 +252,7 @@ export async function POST(request: NextRequest) {
       console.error('Error créditos:', e)
     }
 
-    return NextResponse.json({
-      success: true,
-      data
-    })
+    return NextResponse.json({ success: true, data })
 
   } catch (error: any) {
     console.error(error)
@@ -222,4 +262,5 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-} 
+}
+````
