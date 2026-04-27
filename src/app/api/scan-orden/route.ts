@@ -115,7 +115,14 @@ CAMPOS:
 - marca, placa (formato ABC123 o ABC1234), color
 - tipo_seguro: RIMAC/MAPFRE/PACIFICO/LA_POSITIVA/HDI/INTERSEGURO/TALLER/OTRO
 - nombre_girador: nombre junto a Tecnico/Perito/Asesor/Realizado por/VoBo/firma
-- taller_origen: TALLER PRINCIPAL o ATENCION A TALLER (NUNCA usar REBIPLAST)
+- taller_origen: buscar en este orden:
+  1. Campo "TALLER PRINCIPAL" → usar el valor, no el label
+  2. Campo "Cliente:" → usar el valor (ej: "Alpiconsult S.A.C.")
+  3. Campo "ATENCION A TALLER" → usar el valor, no el label
+  4. "a los señores [nombre]" → usar el nombre
+  5. Empresa en firma inferior
+  NUNCA usar: REBIPLAST, "ATENCION A TALLER" como texto, "TALLER PRINCIPAL" como texto
+  SIEMPRE extraer el VALOR del campo, no el nombre del campo
 
 CANDIDATOS - meter todo lo que veas aunque no estés seguro:
 - candidatos.seguros: logos/nombres de seguros visibles
