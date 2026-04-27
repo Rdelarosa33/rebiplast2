@@ -57,7 +57,6 @@ try {
 const formData = await request.formData()
 const file = formData.get('imagen') as File
 
-```
 if (!file) {
   return NextResponse.json({ error: 'No hay imagen' }, { status: 400 })
 }
@@ -90,3 +89,4 @@ return NextResponse.json(
 
 }
 } 
+ 
