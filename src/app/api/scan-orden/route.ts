@@ -1,163 +1,164 @@
 import { NextRequest, NextResponse } from 'next/server'
+import Anthropic from '@anthropic-ai/sdk'
+import { createClient as createSupabase } from '@supabase/supabase-js'
 
-const PROMPT = `
-Lee visualmente esta orden de trabajo automotriz peruana y extrae datos reales.
+// ================================================
+// CONFIGURACIÓN: elige qué proveedor usar
+// ================================================
+const USE_GOOGLE_VISION = true  // OCR: extrae texto de la imagen
+const USE_CLAUDE = false         // Interpreta con Claude Haiku
+const USE_OPENAI = true          // Interpreta con GPT-4o-mini
+const USE_OPENAI_VISION = false  // OCR + interpretación todo con GPT-4o
+// ================================================
 
-Campos obligatorios:
-- numero_siniestro
-- numero_orden
-- marca
-- placa
-- tipo_seguro
-- nombre_girador
-- taller_origen
-- color
-- piezas
+const PROMPT = `Extrae datos de esta orden de trabajo de taller automotriz peruano. Responde SOLO con JSON.
 
-Reglas:
-tipo_seguro: RIMAC, MAPFRE, PACIFICO, LA_POSITIVA, INTERSEGURO, HDI, TALLER u OTRO.
+SEGUROS: RIMAC, MAPFRE, PACIFICO(o EA Corp), LA_POSITIVA, HDI, INTERSEGURO(o Qualität), TALLER, OTRO
 
-nombre_girador:
-buscar cerca de Técnico, Perito, Asesor, Ajustador, Inspector, Responsable, Autorizado, VoBo, Realizado por, Nombre Usuario o firma.
+GIRADOR - busca el nombre junto a cualquiera de estas palabras:
+Técnico, Perito, Asesor, Ajustador, Inspector, Liquidador, Realizado por, Jefe de Siniestros, Jefe de Taller, Nombre Usuario, VoBo, Autorizado por
+EXCEPCIÓN: INTERSEGURO → girador siempre = "José Fernández"
 
-taller_origen:
-buscar en TALLER PRINCIPAL, ATENCIÓN A TALLER, Cliente, Sede, a los señores, Dirección Taller, Razón Social Proveedor.
-No uses REIBPLAST como taller_origen si es receptor.
+TALLER ORIGEN - busca junto a: Atención a Taller, Taller Principal, Cliente, Sede, "a los señores"
 
-piezas:
-extrae cada pieza por separado.
-REP, REPARA, REPARAR, REPARACIÓN = reparación.
-PINTURA, PINTAR, RP = pintura.
-FARO, NEBLINERO, LUZ = es_faro.
-PULIDO = requiere_pulido.
-LH/IZQ = Izquierdo.
-RH/DER = Derecho.
-DEL/DELT = Frontal.
-POST = Posterior.
-`
+NÚMERO DE ORDEN:
+- RIMAC formato 1: campo "N°" al inicio / formato 2: campo "NRO DE OC"
+- MAPFRE: número después de "ORDEN DE TRABAJO"
+- LA POSITIVA: campo "N° OC"
+- PACIFICO: campo "NumOS" o "ORDEN DE TRABAJO Nro."
+- INTERSEGURO: campo "ORDEN DE TRABAJO No."
+
+PLACA: buscar en campos "Placa", "Rodaje", "PLACA"
+SINIESTRO: buscar en campos "Siniestro", "SINIESTRO", "CASO"
+
+PIEZAS - extrae cada servicio/pieza:
+- "REP", "REPARA", "REPARAR", "REPARACION" → requiere_reparacion=true, tipo="R"
+- "PINTURA", "+ Pintura", "RP" → requiere_pintura=true, tipo="RP"
+- LH=Izquierdo, RH=Derecho, DELT=Frontal, POST=Posterior
+- FARO, NEBLINERO → es_faro=true
+- Ignorar subtotales, IGV, totales, filas vacías
+
+JSON de respuesta:
+{"numero_siniestro":null,"numero_orden":null,"expediente":null,"poliza":null,"placa":null,"marca":null,"modelo":null,"anio":null,"color":null,"vin":null,"nombre_asegurado":null,"telefono_asegurado":null,"tipo_seguro":"RIMAC","nombre_girador":null,"taller_origen":null,"fecha_recojo":null,"observaciones":null,"piezas":[{"nombre":"","lado":"N/A","color":null,"requiere_reparacion":true,"requiere_pintura":false,"es_faro":false,"requiere_pulido":false,"tipo_trabajo":"R","precio":null}]}`
+
+async function procesarConGoogleVision(base64: string) {
+  const apiKey = process.env.GOOGLE_VISION_API_KEY
+  if (!apiKey) throw new Error('GOOGLE_VISION_API_KEY no configurada')
+
+  const visionRes = await fetch(
+    `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requests: [{ image: { content: base64 }, features: [{ type: 'DOCUMENT_TEXT_DETECTION' }] }]
+      })
+    }
+  )
+  const visionData = await visionRes.json()
+  if (visionData.error) throw new Error(visionData.error.message)
+  const textoExtraido = visionData.responses?.[0]?.fullTextAnnotation?.text || ''
+  if (!textoExtraido) throw new Error('No se pudo extraer texto de la imagen')
+
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const response = await client.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 2000,
+    messages: [{ role: 'user', content: `${PROMPT}\n\nTexto extraído de la orden:\n\n${textoExtraido}` }]
+  })
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  return text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+}
+
+async function procesarConOpenAI(base64: string, mediaType: string) {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) throw new Error('OPENAI_API_KEY no configurada')
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      max_tokens: 2000,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: `data:${mediaType};base64,${base64}`, detail: 'high' } },
+          { type: 'text', text: PROMPT }
+        ]
+      }]
+    })
+  })
+  const data = await res.json()
+  if (data.error) throw new Error(data.error.message)
+  const text = data.choices?.[0]?.message?.content || ''
+  return text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+}
 
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
     const file = formData.get('imagen') as File
-
-    if (!file) {
-      return NextResponse.json({ error: 'No hay imagen' }, { status: 400 })
-    }
+    if (!file) return NextResponse.json({ error: 'No se recibio imagen' }, { status: 400 })
 
     const bytes = await file.arrayBuffer()
     const base64 = Buffer.from(bytes).toString('base64')
-    const mediaType = file.type || 'image/jpeg'
+    const mediaType = file.type
 
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        temperature: 0,
-        max_tokens: 1200,
-        response_format: {
-          type: 'json_schema',
-          json_schema: {
-            name: 'orden_taller',
-            schema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                numero_siniestro: { type: ['string', 'null'] },
-                numero_orden: { type: ['string', 'null'] },
-                marca: { type: ['string', 'null'] },
-                placa: { type: ['string', 'null'] },
-                tipo_seguro: { type: ['string', 'null'] },
-                nombre_girador: { type: ['string', 'null'] },
-                taller_origen: { type: ['string', 'null'] },
-                color: { type: ['string', 'null'] },
-                piezas: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    additionalProperties: false,
-                    properties: {
-                      nombre: { type: ['string', 'null'] },
-                      lado: { type: ['string', 'null'] },
-                      requiere_reparacion: { type: 'boolean' },
-                      requiere_pintura: { type: 'boolean' },
-                      es_faro: { type: 'boolean' },
-                      requiere_pulido: { type: 'boolean' },
-                      tipo_trabajo: { type: ['string', 'null'] },
-                    },
-                    required: [
-                      'nombre',
-                      'lado',
-                      'requiere_reparacion',
-                      'requiere_pintura',
-                      'es_faro',
-                      'requiere_pulido',
-                      'tipo_trabajo',
-                    ],
-                  },
-                },
-              },
-              required: [
-                'numero_siniestro',
-                'numero_orden',
-                'marca',
-                'placa',
-                'tipo_seguro',
-                'nombre_girador',
-                'taller_origen',
-                'color',
-                'piezas',
-              ],
-            },
-          },
-        },
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: PROMPT },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: `data:${mediaType};base64,${base64}`,
-                  detail: 'high',
-                },
-              },
-            ],
-          },
-        ],
-      }),
-    })
+    let jsonText = ''
+    let proveedor = ''
 
-    const result = await res.json()
-
-    if (result.error) {
-      throw new Error(result.error.message)
+    // Google Vision siempre hace el OCR
+    if (USE_OPENAI) {
+      jsonText = await procesarConGoogleVisionOpenAI(base64)
+      proveedor = 'google+openai'
+    } else if (USE_CLAUDE) {
+      jsonText = await procesarConGoogleVision(base64)
+      proveedor = 'google+claude'
+    } else {
+      return NextResponse.json({ error: 'No hay intérprete configurado' }, { status: 500 })
     }
 
-    const content = result.choices?.[0]?.message?.content
+    const data = JSON.parse(jsonText)
 
-    if (!content) {
-      throw new Error('OpenAI no devolvió contenido')
+    // Registrar uso y descontar credito
+    try {
+      const supabase = createSupabase(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+      )
+      const COSTO = 0.50
+
+      // Verificar saldo
+      const { data: cred } = await supabase.from('creditos_ocr').select('id, saldo').single()
+      if (cred && cred.saldo < COSTO) {
+        return NextResponse.json({ error: 'Saldo OCR insuficiente. Recarga tus créditos.' }, { status: 402 })
+      }
+
+      // Descontar saldo
+      if (cred) {
+        await supabase.from('creditos_ocr')
+          .update({ saldo: cred.saldo - COSTO, updated_at: new Date().toISOString() })
+          .eq('id', cred.id)
+      }
+
+      // Registrar uso
+      await supabase.from('uso_ocr').insert({
+        seguro_detectado: data.tipo_seguro,
+        piezas_extraidas: data.piezas?.length || 0,
+        numero_siniestro: data.numero_siniestro,
+        costo: COSTO,
+        exitoso: true,
+      })
+    } catch (e) {
+      console.error('Error registrando uso OCR:', e)
     }
 
-    const parsed = JSON.parse(content)
+    return NextResponse.json({ success: true, data, proveedor })
 
-    return NextResponse.json({
-      success: true,
-      data: parsed,
-    })
   } catch (error: any) {
     console.error('Error scan-orden:', error)
-
-    return NextResponse.json(
-      { error: error.message || 'Error al procesar' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: error.message || 'Error al procesar' }, { status: 500 })
   }
-} 
+}
  
