@@ -54,29 +54,27 @@ TALLER ORIGEN (CRITICO)
 ========================
 El taller_origen es el lugar donde se ejecuta el trabajo, NO la aseguradora.
 
+REGLA ABSOLUTA:
+- Si existe "TALLER PRINCIPAL", usar ese valor SIEMPRE y no buscar más.
+
 Prioridad:
-1. "TALLER PRINCIPAL"
+1. "TALLER PRINCIPAL" ← OBLIGATORIO si existe
 2. "ATENCION A TALLER"
 3. Nombre después de "a los señores"
 4. "Cliente" (si es empresa/taller)
 5. Empresa en texto central o superior relacionada al servicio
 
 REGLAS:
-- NUNCA usar aseguradoras como taller:
-  - La Positiva
-  - Rimac
-  - Mapfre
-  - Pacifico
-  - Interseguro
+- NUNCA usar aseguradoras:
+  La Positiva, Rimac, Mapfre, Pacifico, Interseguro
 
 - NUNCA usar:
-  - Rebiplast
-  - Rebiplast E.I.R.L.
-  - Rebiplast EIRL
-  - Rafael Gonzales
+  Rebiplast, Rebiplast E.I.R.L., Rebiplast EIRL, Rafael Gonzales
+
+- Si un valor prohibido aparece como posible taller, IGNORARLO y buscar otro
+- Si no hay otro válido, devolver null
 
 - Elegir empresa/taller, no persona
-- Si hay duda, elegir el nombre que recibe el trabajo
 
 ========================
 PIEZAS - SEPARACION OBLIGATORIA
