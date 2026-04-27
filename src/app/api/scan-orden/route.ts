@@ -138,6 +138,13 @@ Campos por pieza:
 
 Ignorar: SUBTOTAL, IGV, TOTAL, filas vacias.
 
+OBSERVACIONES (SIEMPRE REVISAR):
+- Contiene informacion critica: piezas adicionales, trabajos especiales
+- Si hay piezas en Observaciones que no aparecen en la tabla, agregarlas
+- INTERSEGURO/QUALITAT: las piezas estan SOLO en Observaciones
+- Formato tipico: "OT POR REPUESTO : FUNDA POST SUP" → pieza = "FUNDA POST SUP"
+- Separar multiples piezas por coma, guion, salto de linea
+
 {"numero_siniestro":null,"numero_orden":null,"marca":null,"placa":null,"color":null,"tipo_seguro":null,"nombre_girador":null,"taller_origen":null,"texto_completo":null,"candidatos":{"seguros":[],"giradores":[],"talleres":[]},"piezas":[{"nombre":"","lado":"N/A","requiere_reparacion":false,"requiere_pintura":false,"es_faro":false,"requiere_pulido":false,"tipo_trabajo":null}]}`
 
 function limpiarJSON(text: string): string {

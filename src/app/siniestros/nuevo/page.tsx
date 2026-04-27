@@ -267,19 +267,7 @@ export default function NuevoSiniestroPage() {
               <div><label className="label">N° Orden</label>
                 <input className="input-field" value={form.numero_orden} onChange={e => setForm({...form, numero_orden: e.target.value})} placeholder="Ej: 2025-01240189" /></div>
             </div>
-            {/* Opcionales colapsables */}
-            <details className="group">
-              <summary className="text-xs text-[#475569] cursor-pointer hover:text-white flex items-center gap-1 select-none">
-                <span className="group-open:hidden">▶ Más datos (expediente, póliza)</span>
-                <span className="hidden group-open:inline">▼ Ocultar</span>
-              </summary>
-              <div className="grid grid-cols-2 gap-3 mt-3">
-                <div><label className="label">Expediente</label>
-                  <input className="input-field" value={form.expediente} onChange={e => setForm({...form, expediente: e.target.value})} placeholder="Ej: 1-PPD" /></div>
-                <div><label className="label">Póliza</label>
-                  <input className="input-field" value={form.poliza} onChange={e => setForm({...form, poliza: e.target.value})} /></div>
-              </div>
-            </details>
+
           </div>
 
           <div className="card p-5 space-y-4">
@@ -290,22 +278,10 @@ export default function NuevoSiniestroPage() {
               <div><label className="label">Marca</label>
                 <input className="input-field" value={form.marca} onChange={e => setForm({...form, marca: e.target.value})} /></div>
             </div>
-            <details className="group">
-              <summary className="text-xs text-[#475569] cursor-pointer hover:text-white flex items-center gap-1 select-none">
-                <span className="group-open:hidden">▶ Más datos (modelo, año, color, VIN)</span>
-                <span className="hidden group-open:inline">▼ Ocultar</span>
-              </summary>
-              <div className="grid grid-cols-2 gap-3 mt-3">
-                <div><label className="label">Modelo</label>
-                  <input className="input-field" value={form.modelo} onChange={e => setForm({...form, modelo: e.target.value})} /></div>
-                <div><label className="label">Año</label>
-                  <input className="input-field" type="number" value={form.anio} onChange={e => setForm({...form, anio: e.target.value})} /></div>
-                <div><label className="label">Color</label>
-                  <input className="input-field" value={form.color} onChange={e => setForm({...form, color: e.target.value})} /></div>
-                <div><label className="label">VIN / Chasis</label>
-                  <input className="input-field" value={form.vin} onChange={e => setForm({...form, vin: e.target.value})} /></div>
-              </div>
-            </details>
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className="label">Color</label>
+                <input className="input-field" value={form.color} onChange={e => setForm({...form, color: e.target.value})} /></div>
+            </div>
           </div>
 
           <div className="card p-5 space-y-4">
@@ -318,18 +294,7 @@ export default function NuevoSiniestroPage() {
               <div><label className="label">Girador</label>
                 <input className="input-field" value={form.nombre_girador} onChange={e => setForm({...form, nombre_girador: e.target.value})} /></div>
             </div>
-            <details className="group">
-              <summary className="text-xs text-[#475569] cursor-pointer hover:text-white flex items-center gap-1 select-none">
-                <span className="group-open:hidden">▶ Más datos (asegurado, teléfono)</span>
-                <span className="hidden group-open:inline">▼ Ocultar</span>
-              </summary>
-              <div className="grid grid-cols-2 gap-3 mt-3">
-                <div><label className="label">Asegurado</label>
-                  <input className="input-field" value={form.nombre_asegurado} onChange={e => setForm({...form, nombre_asegurado: e.target.value})} /></div>
-                <div><label className="label">Teléfono</label>
-                  <input className="input-field" value={form.telefono_asegurado} onChange={e => setForm({...form, telefono_asegurado: e.target.value})} /></div>
-              </div>
-            </details>
+
           </div>
 
           <div className="card p-5 space-y-4">
