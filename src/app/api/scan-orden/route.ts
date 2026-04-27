@@ -1,263 +1,190 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
 import { createClient as createSupabase } from '@supabase/supabase-js'
 
 // ================================================
-// CONFIGURACIÓN: elige qué proveedor usar
+// CONFIG
 // ================================================
 const USE_GOOGLE_VISION = true
-const USE_CLAUDE = false
 const USE_OPENAI = true
-const USE_OPENAI_VISION = false
 // ================================================
 
-const PROMPT = `Extrae datos de esta orden de trabajo de taller automotriz peruano. Responde SOLO con JSON.
+// 🔥 PROMPT OPTIMIZADO (corto)
+const PROMPT = `Extrae datos de una orden automotriz peruana desde texto OCR.
 
-SEGUROS: RIMAC, MAPFRE, PACIFICO(o EA Corp), LA_POSITIVA, HDI, INTERSEGURO(o Qualität), TALLER, OTRO
+Responde SOLO JSON.
 
-GIRADOR - busca el nombre junto a cualquiera de estas palabras:
-Técnico, Perito, Asesor, Ajustador, Inspector, Liquidador, Realizado por, Jefe de Siniestros, Jefe de Taller, Nombre Usuario, VoBo, Autorizado por
-EXCEPCIÓN: INTERSEGURO → girador siempre = "José Fernández"
+SEGURO:
+RIMAC, MAPFRE, LA_POSITIVA, PACIFICO, INTERSEGURO, HDI, TALLER.
 
-TALLER ORIGEN - busca junto a: Atención a Taller, Taller Principal, Cliente, Sede, "a los señores"
+CAMPOS:
+numero_orden (N°, ORDEN, NumOS)
+numero_siniestro (Siniestro, Caso)
+placa (Placa, Rodaje)
+poliza (Póliza)
+expediente (Expediente)
 
-NÚMERO DE ORDEN:
-- RIMAC formato 1: campo "N°" al inicio / formato 2: campo "NRO DE OC"
-- MAPFRE: número después de "ORDEN DE TRABAJO"
-- LA POSITIVA: campo "N° OC"
-- PACIFICO: campo "NumOS" o "ORDEN DE TRABAJO Nro."
-- INTERSEGURO: campo "ORDEN DE TRABAJO No."
+GIRADOR:
+Técnico, Perito, Asesor, Ajustador, Inspector, Responsable, Autorizado, VoBo
+INTERSEGURO = "José Fernández"
 
-PLACA: buscar en campos "Placa", "Rodaje", "PLACA"
-SINIESTRO: buscar en campos "Siniestro", "SINIESTRO", "CASO"
+TALLER:
+Atención a Taller, Cliente, Sede, Proveedor
 
-PIEZAS - extrae cada servicio/pieza:
-- "REP", "REPARA", "REPARAR", "REPARACION" → requiere_reparacion=true, tipo="R"
-- "PINTURA", "+ Pintura", "RP" → requiere_pintura=true, tipo="RP"
-- LH=Izquierdo, RH=Derecho, DELT=Frontal, POST=Posterior
-- FARO, NEBLINERO → es_faro=true
-- Ignorar subtotales, IGV, totales, filas vacías
+PIEZAS:
+REP o REPARA → reparacion
+PINTURA o RP → pintura
+ambos → "RP", si no → "R"
 
-JSON de respuesta:
-{"numero_siniestro":null,"numero_orden":null,"expediente":null,"poliza":null,"placa":null,"marca":null,"modelo":null,"anio":null,"color":null,"vin":null,"nombre_asegurado":null,"telefono_asegurado":null,"tipo_seguro":"RIMAC","nombre_girador":null,"taller_origen":null,"fecha_recojo":null,"observaciones":null,"piezas":[{"nombre":"","lado":"N/A","color":null,"requiere_reparacion":true,"requiere_pintura":false,"es_faro":false,"requiere_pulido":false,"tipo_trabajo":"R","precio":null}]}`
+LADOS:
+LH=Izq, RH=Der, DELT=Front, POST=Post
 
+Ignorar totales e IGV.
+Si dudas → null.
+
+JSON:
+{
+"numero_siniestro":null,
+"numero_orden":null,
+"expediente":null,
+"poliza":null,
+"placa":null,
+"marca":null,
+"modelo":null,
+"anio":null,
+"color":null,
+"vin":null,
+"nombre_asegurado":null,
+"telefono_asegurado":null,
+"tipo_seguro":"TALLER",
+"nombre_girador":null,
+"taller_origen":null,
+"fecha_recojo":null,
+"observaciones":null,
+"piezas":[{"nombre":"","lado":"N/A","color":null,"requiere_reparacion":true,"requiere_pintura":false,"es_faro":false,"requiere_pulido":false,"tipo_trabajo":"R","precio":null}]
+}`
+
+// ================================================
+// OCR GOOGLE (solo texto)
+// ================================================
 async function extraerTextoGoogleVision(base64: string) {
   const apiKey = process.env.GOOGLE_VISION_API_KEY
-  if (!apiKey) throw new Error('GOOGLE_VISION_API_KEY no configurada')
+  if (!apiKey) throw new Error('Falta GOOGLE_VISION_API_KEY')
 
-  const visionRes = await fetch(
+  const res = await fetch(
     `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        requests: [
-          {
-            image: { content: base64 },
-            features: [{ type: 'DOCUMENT_TEXT_DETECTION' }],
-          },
-        ],
-      }),
+        requests: [{
+          image: { content: base64 },
+          features: [{ type: 'DOCUMENT_TEXT_DETECTION' }]
+        }]
+      })
     }
   )
 
-  const visionData = await visionRes.json()
+  const data = await res.json()
 
-  if (visionData.error) {
-    throw new Error(visionData.error.message)
-  }
+  const texto = data.responses?.[0]?.fullTextAnnotation?.text || ''
+  if (!texto) throw new Error('OCR vacío')
 
-  const textoExtraido =
-    visionData.responses?.[0]?.fullTextAnnotation?.text || ''
-
-  if (!textoExtraido) {
-    throw new Error('No se pudo extraer texto de la imagen')
-  }
-
-  return textoExtraido
+  // 🔥 RECORTE CLAVE (AHORRO $$$)
+  return texto.slice(0, 4000)
 }
 
-async function procesarConGoogleVisionClaude(base64: string) {
-  const textoExtraido = await extraerTextoGoogleVision(base64)
-
-  const client = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY,
-  })
-
-  const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 2000,
-    messages: [
-      {
-        role: 'user',
-        content: `${PROMPT}\n\nTexto extraído de la orden:\n\n${textoExtraido}`,
-      },
-    ],
-  })
-
-  const text =
-    response.content[0]?.type === 'text'
-      ? response.content[0].text
-      : ''
-
-  return limpiarJson(text)
-}
-
-async function procesarConGoogleVisionOpenAI(base64: string) {
-  const textoExtraido = await extraerTextoGoogleVision(base64)
-
+// ================================================
+// OPENAI (interpretación barata)
+// ================================================
+async function interpretarConOpenAI(texto: string) {
   const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) throw new Error('OPENAI_API_KEY no configurada')
+  if (!apiKey) throw new Error('Falta OPENAI_API_KEY')
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${apiKey}`
     },
     body: JSON.stringify({
       model: 'gpt-4o-mini',
-      max_tokens: 2000,
+      max_tokens: 800, // 🔥 reducido
       messages: [
         {
           role: 'user',
-          content: `${PROMPT}\n\nTexto OCR extraído de la orden:\n\n${textoExtraido}`,
-        },
-      ],
-    }),
+          content: `${PROMPT}\n\nOCR:\n${texto}`
+        }
+      ]
+    })
   })
 
   const data = await res.json()
 
-  if (data.error) {
-    throw new Error(data.error.message)
-  }
+  if (data.error) throw new Error(data.error.message)
 
   const text = data.choices?.[0]?.message?.content || ''
-  return limpiarJson(text)
-}
 
-async function procesarConOpenAIVision(base64: string, mediaType: string) {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) throw new Error('OPENAI_API_KEY no configurada')
-
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      max_tokens: 2000,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'image_url',
-              image_url: {
-                url: `data:${mediaType};base64,${base64}`,
-                detail: 'high',
-              },
-            },
-            { type: 'text', text: PROMPT },
-          ],
-        },
-      ],
-    }),
-  })
-
-  const data = await res.json()
-
-  if (data.error) {
-    throw new Error(data.error.message)
-  }
-
-  const text = data.choices?.[0]?.message?.content || ''
-  return limpiarJson(text)
-}
-
-function limpiarJson(text: string) {
   return text
     .replace(/```json\n?/g, '')
     .replace(/```\n?/g, '')
     .trim()
 }
 
-function parsearJsonSeguro(jsonText: string) {
+// ================================================
+// JSON seguro
+// ================================================
+function parseSeguro(text: string) {
   try {
-    return JSON.parse(jsonText)
+    return JSON.parse(text)
   } catch {
-    console.error('Respuesta no válida:', jsonText)
-    throw new Error('La IA no devolvió un JSON válido')
+    console.error('JSON inválido:', text)
+    throw new Error('IA no devolvió JSON válido')
   }
 }
 
+// ================================================
+// API
+// ================================================
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
     const file = formData.get('imagen') as File
 
     if (!file) {
-      return NextResponse.json(
-        { error: 'No se recibió imagen' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'No hay imagen' }, { status: 400 })
     }
 
     const bytes = await file.arrayBuffer()
     const base64 = Buffer.from(bytes).toString('base64')
-    const mediaType = file.type || 'image/jpeg'
 
-    let jsonText = ''
-    let proveedor = ''
+    // 🔹 OCR
+    const textoOCR = await extraerTextoGoogleVision(base64)
 
-    if (USE_GOOGLE_VISION && USE_OPENAI) {
-      jsonText = await procesarConGoogleVisionOpenAI(base64)
-      proveedor = 'google+openai'
-    } else if (USE_GOOGLE_VISION && USE_CLAUDE) {
-      jsonText = await procesarConGoogleVisionClaude(base64)
-      proveedor = 'google+claude'
-    } else if (USE_OPENAI_VISION) {
-      jsonText = await procesarConOpenAIVision(base64, mediaType)
-      proveedor = 'openai-vision'
-    } else {
-      return NextResponse.json(
-        { error: 'No hay proveedor configurado' },
-        { status: 500 }
-      )
-    }
+    // 🔹 IA
+    const jsonText = await interpretarConOpenAI(textoOCR)
 
-    const data = parsearJsonSeguro(jsonText)
+    const data = parseSeguro(jsonText)
 
+    // ============================================
+    // 💰 COBRO
+    // ============================================
     try {
       const supabase = createSupabase(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        {
-          auth: {
-            autoRefreshToken: false,
-            persistSession: false,
-          },
-        }
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
       )
 
       const COSTO = 0.5
 
-      const { data: cred, error: credError } = await supabase
+      const { data: cred } = await supabase
         .from('creditos_ocr')
         .select('id, saldo')
         .limit(1)
         .single()
 
-      if (credError) {
-        console.error('Error consultando créditos OCR:', credError)
-      }
-
       if (cred && Number(cred.saldo) < COSTO) {
         return NextResponse.json(
-          { error: 'Saldo OCR insuficiente. Recarga tus créditos.' },
+          { error: 'Saldo insuficiente' },
           { status: 402 }
         )
       }
@@ -266,37 +193,33 @@ export async function POST(request: NextRequest) {
         await supabase
           .from('creditos_ocr')
           .update({
-            saldo: Number(cred.saldo) - COSTO,
-            updated_at: new Date().toISOString(),
+            saldo: Number(cred.saldo) - COSTO
           })
           .eq('id', cred.id)
       }
 
       await supabase.from('uso_ocr').insert({
-        seguro_detectado: data.tipo_seguro || null,
+        costo: COSTO,
         piezas_extraidas: data.piezas?.length || 0,
         numero_siniestro: data.numero_siniestro || null,
-        costo: COSTO,
-        proveedor,
-        exitoso: true,
+        exitoso: true
       })
+
     } catch (e) {
-      console.error('Error registrando uso OCR:', e)
+      console.error('Error créditos:', e)
     }
 
     return NextResponse.json({
       success: true,
-      data,
-      proveedor,
+      data
     })
+
   } catch (error: any) {
-    console.error('Error scan-orden:', error)
+    console.error(error)
 
     return NextResponse.json(
-      {
-        error: error.message || 'Error al procesar',
-      },
+      { error: error.message },
       { status: 500 }
     )
   }
-}
+} 
