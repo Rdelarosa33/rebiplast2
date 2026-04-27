@@ -1,37 +1,91 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
 import { createClient as createSupabase } from '@supabase/supabase-js'
 
-const PROMPT = `Extrae datos de esta orden de trabajo de taller automotriz peruano. Responde SOLO con JSON.
+const PROMPT = `Lee esta orden de trabajo automotriz peruana desde una imagen.
 
-SEGUROS: RIMAC, MAPFRE, PACIFICO(o EA Corp), LA_POSITIVA, HDI, INTERSEGURO(o Qualität), TALLER, OTRO
+Si la imagen es grande o pesada, analiza toda la información visible y enfócate en las zonas con mayor concentración de texto. Si es necesario, interpreta incluso texto borroso o de baja calidad.
 
-GIRADOR - busca nombre junto a estas palabras:
-Técnico, Perito, Asesor, Ajustador, Inspector, Liquidador, Realizado por, Jefe de Siniestros, Jefe de Taller, Nombre Usuario, VoBo, Autorizado por
-EXCEPCIÓN: INTERSEGURO → girador = "José Fernández" siempre.
+Devuelve SOLO JSON válido.
 
-TALLER ORIGEN - busca junto a: Atención a Taller, Taller Principal, Cliente, Sede, "a los señores"
+========================
+CAMPOS CRÍTICOS (OBLIGATORIOS)
+========================
+Debes intentar encontrar SI O SI:
+- numero_siniestro, numero_orden, marca, placa, tipo_seguro, nombre_girador, taller_origen, color, piezas
 
-NÚMERO DE ORDEN por seguro:
-- RIMAC fmt1: campo "N°" al inicio | fmt2: "NRO DE OC"
-- MAPFRE: número después de "ORDEN DE TRABAJO"
-- LA POSITIVA: "N° OC"
-- PACIFICO: "NumOS" o "ORDEN DE TRABAJO Nro."
-- INTERSEGURO: "ORDEN DE TRABAJO No."
+IMPORTANTE:
+- No inventar datos
+- Si existe un valor probable, úsalo
+- Solo usar null si NO existe nada parecido en el documento
 
-PLACA: buscar en "Placa", "Rodaje", "PLACA"
-SINIESTRO: buscar en "Siniestro", "SINIESTRO", "CASO"
+========================
+DETECTAR SEGURO
+========================
+- RIMAC → si aparece RIMAC
+- MAPFRE → si aparece MAPFRE
+- PACIFICO → si aparece Pacífico o EA Corp
+- LA_POSITIVA → si aparece La Positiva
+- INTERSEGURO → si aparece Qualitat, Interseguro
+- OTRO → si no
 
-PIEZAS - extrae cada servicio:
-- "REP", "REPARA", "REPARAR", "REPARACION" → requiere_reparacion=true, tipo="R"
-- "PINTURA", "+ Pintura", "RP" → requiere_pintura=true, tipo="RP"
-- LH=Izquierdo, RH=Derecho, DELT=Frontal, POST=Posterior
-- FARO, NEBLINERO → es_faro=true
-- Ignorar subtotales, IGV, totales, filas vacías
-- MAPFRE: cada línea "REP xxx" es una pieza separada
-- INTERSEGURO: pieza está en campo "Observaciones"
+========================
+NUMERO ORDEN
+========================
+Buscar: NRO DE OC, ORDEN DE TRABAJO, OC-, NumOS, N°
 
-{"numero_siniestro":null,"numero_orden":null,"expediente":null,"poliza":null,"placa":null,"marca":null,"modelo":null,"anio":null,"color":null,"vin":null,"nombre_asegurado":null,"telefono_asegurado":null,"tipo_seguro":"RIMAC","nombre_girador":null,"taller_origen":null,"fecha_recojo":null,"observaciones":null,"piezas":[{"nombre":"","lado":"N/A","color":null,"requiere_reparacion":true,"requiere_pintura":false,"es_faro":false,"requiere_pulido":false,"tipo_trabajo":"R","precio":null}]}`
+========================
+SINIESTRO
+========================
+Buscar: Siniestro, Caso, Número de caso
+
+========================
+PLACA (MUY IMPORTANTE)
+========================
+Buscar en TODO el documento. Formato: 3 letras + 3-4 números (ABC123).
+Suele estar cerca de: VIN, Marca, Modelo, Rodaje.
+Si encuentras un valor probable úsalo aunque esté poco claro.
+
+========================
+GIRADOR (PRIORIDAD)
+========================
+Buscar nombre junto a: Técnico, Realizado por, Asesor, Inspector, Jefe de Taller, Autorizado, VoBo, Firma con nombre debajo.
+Elegir el nombre más claro.
+
+========================
+TALLER_ORIGEN (CRÍTICO)
+========================
+Buscar en este orden:
+1. TALLER PRINCIPAL
+2. ATENCIÓN A TALLER
+3. Cliente
+4. Texto después de "a los señores"
+5. Empresa en firma inferior
+
+REGLAS:
+- IGNORAR "REBIPLAST"
+- Elegir el taller que envía el trabajo
+- Preferir empresa sobre persona
+
+========================
+EXTRACCIÓN DE PIEZAS
+========================
+Cada línea de trabajo/servicio es una pieza independiente.
+
+Para cada pieza:
+- nombre: texto descriptivo (combinar si es muy corto)
+- lado: LH/IZQ=Izquierdo, RH/DER=Derecho, DEL/DELT=Frontal, POST=Posterior, sino N/A
+- requiere_reparacion: si dice REP, REPARA, REPARAR, REPARACIÓN
+- requiere_pintura: si dice PINTURA, PINTAR, RP
+- es_faro: si dice FARO, NEBLINERO, LUZ
+- requiere_pulido: si dice PULIDO o es faro sin cambio/reemplazo
+- tipo_trabajo: RP=reparación+pintura, R=solo reparación, P=solo pintura, PU=solo pulido
+
+REGLAS: No agrupar piezas. Ignorar SUBTOTAL, IGV, TOTAL.
+
+========================
+FORMATO JSON (responde SOLO esto)
+========================
+{"numero_siniestro":null,"numero_orden":null,"marca":null,"placa":null,"tipo_seguro":null,"nombre_girador":null,"taller_origen":null,"color":null,"piezas":[{"nombre":"","lado":"N/A","requiere_reparacion":false,"requiere_pintura":false,"es_faro":false,"requiere_pulido":false,"tipo_trabajo":null}]}`
 
 function limpiarJSON(text: string): string {
   return text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
@@ -49,7 +103,6 @@ export async function POST(request: NextRequest) {
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) throw new Error('OPENAI_API_KEY no configurada')
 
-    // GPT-4o-mini lee la imagen directamente
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -60,24 +113,16 @@ export async function POST(request: NextRequest) {
         model: 'gpt-4o-mini',
         max_tokens: 1200,
         temperature: 0,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'image_url',
-                image_url: {
-                  url: `data:${file.type};base64,${base64}`,
-                  detail: 'high'
-                }
-              },
-              {
-                type: 'text',
-                text: PROMPT
-              }
-            ]
-          }
-        ]
+        messages: [{
+          role: 'user',
+          content: [
+            {
+              type: 'image_url',
+              image_url: { url: `data:${file.type};base64,${base64}`, detail: 'high' }
+            },
+            { type: 'text', text: PROMPT }
+          ]
+        }]
       })
     })
 
@@ -95,7 +140,6 @@ export async function POST(request: NextRequest) {
         { auth: { autoRefreshToken: false, persistSession: false } }
       )
       const COSTO = 0.50
-
       const { data: cred } = await supabase.from('creditos_ocr').select('id, saldo').single()
       if (cred && cred.saldo < COSTO) {
         return NextResponse.json({ error: 'Saldo OCR insuficiente. Recarga tus créditos.' }, { status: 402 })
