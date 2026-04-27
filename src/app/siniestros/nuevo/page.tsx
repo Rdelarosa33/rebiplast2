@@ -17,8 +17,6 @@ interface PiezaForm {
   tipo_trabajo: string
   precio: string
   observaciones: string
-  monto_total: string
-  moneda: string
 }
 
 const PIEZA_VACIA: PiezaForm = {
