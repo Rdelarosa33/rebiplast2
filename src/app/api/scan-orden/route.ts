@@ -9,12 +9,12 @@ Devuelve SOLO JSON válido sin markdown ni explicaciones.
 DATOS OBLIGATORIOS
 ========================
 Extrae siempre: numero_siniestro, numero_orden, marca, placa, tipo_seguro, nombre_girador, taller_origen, color, piezas.
-No inventar datos. Si existe un valor probable usalo. Solo null si no existe nada.
+No inventar datos. Si existe un valor probable usalo. Solo null si no existe nada , en ningun caso el valor puede ser rafael Gonzales ni Rebiplast.
 
 ========================
 DETECTAR SEGURO
 ========================
-RIMAC, MAPFRE, PACIFICO(o EA Corp), LA_POSITIVA, HDI, INTERSEGURO(o Qualitat), OTRO
+RIMAC, MAPFRE, PACIFICO, LA_POSITIVA, INTERSEGURO. si no se encuentra poner nombre de taller.
 
 ========================
 NUMERO ORDEN
@@ -24,7 +24,7 @@ Buscar: NRO DE OC, ORDEN DE TRABAJO, OC-, NumOS, N°, Folio
 ========================
 PLACA (CRITICA)
 ========================
-Buscar en TODO el documento. Formato ABC123 o ABC1234. Cerca de VIN, Marca, Modelo, Rodaje. Si hay valor probable usarlo.
+Buscar en TODO el documento. Formato ABC123 o ABC-123. Cerca de VIN, Marca, Modelo, Rodaje. Si hay valor probable usarlo.
 
 ========================
 GIRADOR
@@ -35,7 +35,7 @@ Buscar nombre junto a: Tecnico, Perito, Asesor, Ajustador, Inspector, Responsabl
 TALLER ORIGEN
 ========================
 Prioridad: TALLER PRINCIPAL > ATENCION A TALLER > Cliente > "a los señores" > firma empresa inferior.
-IGNORAR REBIPLAST.
+IGNORAR REBIPLAST o Rafael Gonzales.
 
 ========================
 PIEZAS - SEPARACION OBLIGATORIA
