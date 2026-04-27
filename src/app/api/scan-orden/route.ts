@@ -108,6 +108,9 @@ Devuelve SOLO JSON válido.
 
 CAMPOS:
 - numero_siniestro: buscar Siniestro/Caso/SINIESTRO
+- datos_extra (capturar si existen):
+  expediente, poliza, modelo, anio, vin/chasis, nombre_asegurado, telefono_asegurado
+  observaciones_orden: texto del campo Observaciones de la orden
 - numero_orden: buscar NRO DE OC/ORDEN DE TRABAJO/OC-/NumOS/N°/Folio
 - marca, placa (formato ABC123 o ABC1234), color
 - tipo_seguro: RIMAC/MAPFRE/PACIFICO/LA_POSITIVA/HDI/INTERSEGURO/TALLER/OTRO
@@ -145,7 +148,7 @@ OBSERVACIONES (SIEMPRE REVISAR):
 - Formato tipico: "OT POR REPUESTO : FUNDA POST SUP" → pieza = "FUNDA POST SUP"
 - Separar multiples piezas por coma, guion, salto de linea
 
-{"numero_siniestro":null,"numero_orden":null,"marca":null,"placa":null,"color":null,"tipo_seguro":null,"nombre_girador":null,"taller_origen":null,"texto_completo":null,"candidatos":{"seguros":[],"giradores":[],"talleres":[]},"piezas":[{"nombre":"","lado":"N/A","requiere_reparacion":false,"requiere_pintura":false,"es_faro":false,"requiere_pulido":false,"tipo_trabajo":null}]}`
+{"numero_siniestro":null,"numero_orden":null,"marca":null,"placa":null,"color":null,"tipo_seguro":null,"nombre_girador":null,"taller_origen":null,"texto_completo":null,"datos_extra":{"expediente":null,"poliza":null,"modelo":null,"anio":null,"vin":null,"nombre_asegurado":null,"telefono_asegurado":null,"observaciones_orden":null},"candidatos":{"seguros":[],"giradores":[],"talleres":[]},"piezas":[{"nombre":"","lado":"N/A","requiere_reparacion":false,"requiere_pintura":false,"es_faro":false,"requiere_pulido":false,"tipo_trabajo":null}]}`
 
 function limpiarJSON(text: string): string {
   return text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
@@ -239,7 +242,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ── PASO 8: Construir resultado final ──
+    // ── PASO 8: Construir observaciones concatenadas ──
+    const extra = data.datos_extra || {}
+    const partsObs: string[] = []
+    if (extra.expediente) partsObs.push(`Expediente: ${extra.expediente}`)
+    if (extra.poliza) partsObs.push(`Póliza: ${extra.poliza}`)
+    if (extra.modelo) partsObs.push(`Modelo: ${extra.modelo}`)
+    if (extra.anio) partsObs.push(`Año: ${extra.anio}`)
+    if (extra.vin) partsObs.push(`VIN: ${extra.vin}`)
+    if (extra.nombre_asegurado) partsObs.push(`Asegurado: ${extra.nombre_asegurado}`)
+    if (extra.telefono_asegurado) partsObs.push(`Tel: ${extra.telefono_asegurado}`)
+    if (extra.observaciones_orden) partsObs.push(`Obs: ${extra.observaciones_orden}`)
+    const observaciones = partsObs.length > 0 ? partsObs.join(' | ') : null
+
+    // ── PASO 9: Construir resultado final ──
     const output: any = {
       numero_siniestro: data.numero_siniestro || null,
       numero_orden: data.numero_orden || null,
@@ -251,10 +267,11 @@ export async function POST(request: NextRequest) {
       taller_origen: tallMatch.nombre || (!estaProhibido(data.taller_origen || '') ? data.taller_origen : null),
       monto_total,
       moneda,
+      observaciones,
       piezas: data.piezas || [],
     }
 
-    // ── PASO 9: Registrar uso y descontar credito ──
+    // ── PASO 10: Registrar uso y descontar credito ──
     try {
       const COSTO = 0.50
       const { data: cred } = await supabase.from('creditos_ocr').select('id, saldo').single()

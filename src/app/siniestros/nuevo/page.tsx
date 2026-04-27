@@ -117,7 +117,7 @@ export default function NuevoSiniestroPage() {
         taller_origen: d.taller_origen || prev.taller_origen,
         fecha_recojo: prev.fecha_recojo, // siempre fecha real
         hora_recojo: prev.hora_recojo,
-        observaciones: d.observaciones || prev.observaciones,
+        observaciones: d.observaciones || prev.observaciones || '',
         monto_total: d.monto_total ? String(d.monto_total) : prev.monto_total,
         moneda: d.moneda || prev.moneda || 'USD',
       }))
