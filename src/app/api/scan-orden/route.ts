@@ -1,4 +1,3 @@
-````ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createSupabase } from '@supabase/supabase-js'
 
@@ -262,5 +261,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-}
-````
+} 
