@@ -1,93 +1,72 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createSupabase } from '@supabase/supabase-js'
 
-const PROMPT = `Lee esta orden de trabajo automotriz peruana desde una imagen.
+const PROMPT = `Lee esta orden de trabajo automotriz peruana desde la imagen.
 
-Si la imagen es grande o pesada, analiza toda la información visible y enfócate en las zonas con mayor concentración de texto. Si es necesario, interpreta incluso texto borroso o de baja calidad.
-
-Devuelve SOLO JSON válido.
+Devuelve SOLO JSON válido sin markdown ni explicaciones.
 
 ========================
-CAMPOS CRÍTICOS (OBLIGATORIOS)
+DATOS OBLIGATORIOS
 ========================
-Debes intentar encontrar SI O SI:
-- numero_siniestro, numero_orden, marca, placa, tipo_seguro, nombre_girador, taller_origen, color, piezas
-
-IMPORTANTE:
-- No inventar datos
-- Si existe un valor probable, úsalo
-- Solo usar null si NO existe nada parecido en el documento
+Extrae siempre: numero_siniestro, numero_orden, marca, placa, tipo_seguro, nombre_girador, taller_origen, color, piezas.
+No inventar datos. Si existe un valor probable usalo. Solo null si no existe nada.
 
 ========================
 DETECTAR SEGURO
 ========================
-- RIMAC → si aparece RIMAC
-- MAPFRE → si aparece MAPFRE
-- PACIFICO → si aparece Pacífico o EA Corp
-- LA_POSITIVA → si aparece La Positiva
-- INTERSEGURO → si aparece Qualitat, Interseguro
-- OTRO → si no
+RIMAC, MAPFRE, PACIFICO(o EA Corp), LA_POSITIVA, HDI, INTERSEGURO(o Qualitat), OTRO
 
 ========================
 NUMERO ORDEN
 ========================
-Buscar: NRO DE OC, ORDEN DE TRABAJO, OC-, NumOS, N°
+Buscar: NRO DE OC, ORDEN DE TRABAJO, OC-, NumOS, N°, Folio
 
 ========================
-SINIESTRO
+PLACA (CRITICA)
 ========================
-Buscar: Siniestro, Caso, Número de caso
+Buscar en TODO el documento. Formato ABC123 o ABC1234. Cerca de VIN, Marca, Modelo, Rodaje. Si hay valor probable usarlo.
 
 ========================
-PLACA (MUY IMPORTANTE)
+GIRADOR
 ========================
-Buscar en TODO el documento. Formato: 3 letras + 3-4 números (ABC123).
-Suele estar cerca de: VIN, Marca, Modelo, Rodaje.
-Si encuentras un valor probable úsalo aunque esté poco claro.
+Buscar nombre junto a: Tecnico, Perito, Asesor, Ajustador, Inspector, Responsable, Autorizado, VoBo, Realizado por, Nombre Usuario, firma.
 
 ========================
-GIRADOR (PRIORIDAD)
+TALLER ORIGEN
 ========================
-Buscar nombre junto a: Técnico, Realizado por, Asesor, Inspector, Jefe de Taller, Autorizado, VoBo, Firma con nombre debajo.
-Elegir el nombre más claro.
-
-REGLAS:
-- IGNORAR "Rafael Gonzales o Gonzales"
-- Preferir Nombre de Persona
+Prioridad: TALLER PRINCIPAL > ATENCION A TALLER > Cliente > "a los señores" > firma empresa inferior.
+IGNORAR REBIPLAST.
 
 ========================
-TALLER_ORIGEN (CRÍTICO)
+PIEZAS - SEPARACION OBLIGATORIA
 ========================
-Buscar en este orden:
-1. TALLER PRINCIPAL
-2. ATENCIÓN A TALLER
-3. Cliente
-4. Texto después de "a los señores"
-5. Empresa en firma inferior
+CADA linea de trabajo = UNA pieza separada. NO agrupar jamas.
 
-REGLAS:
-- IGNORAR "REBIPLAST"
-- Elegir el taller que envía el trabajo
-- Preferir empresa sobre persona
+MAPFRE: cada linea REP = pieza independiente
+  REP FUNDA DEL = pieza 1
+  REP REJILLA DEL = pieza 2
 
-========================
-EXTRACCIÓN DE PIEZAS
-========================
-Cada línea de trabajo/servicio es una pieza independiente.
+RIMAC: cada fila descripcion o SERVICIO = una pieza
+
+LA_POSITIVA: tabla Reparacion/Descripcion, cada fila = una pieza
+
+PACIFICO/EA Corp: tabla OPERACION/DESCRIPCION, cada fila = una pieza
+
+INTERSEGURO: piezas en Observaciones, separar por coma/guion/salto de linea
 
 Para cada pieza:
-- nombre: texto descriptivo (combinar si es muy corto)
+- nombre: texto descriptivo
 - lado: LH/IZQ=Izquierdo, RH/DER=Derecho, DEL/DELT=Frontal, POST=Posterior, sino N/A
-- requiere_reparacion: si dice REP, REPARA, REPARAR, REPARACIÓN
-- requiere_pintura: si dice PINTURA, PINTAR, RP
-- es_faro: si dice FARO, NEBLINERO, LUZ
-- requiere_pulido: si dice PULIDO o es faro sin cambio/reemplazo
-- tipo_trabajo: RP=reparación+pintura, R=solo reparación, P=solo pintura, PU=solo pulido
+- requiere_reparacion: si REP/REPARA/REPARAR
+- requiere_pintura: si PINTURA/PINTAR/RP
+- es_faro: si FARO/NEBLINERO/LUZ
+- requiere_pulido: si PULIDO o es_faro sin cambio/reemplazo
+- tipo_trabajo: RP=reparacion+pintura, R=solo rep, P=solo pintura, PU=solo pulido
 
-REGLAS: No agrupar piezas. Ignorar SUBTOTAL, IGV, TOTAL.
+Ignorar: SUBTOTAL, IGV, TOTAL, filas vacias.
 
 ========================
-FORMATO JSON (responde SOLO esto)
+JSON RESPUESTA
 ========================
 {"numero_siniestro":null,"numero_orden":null,"marca":null,"placa":null,"tipo_seguro":null,"nombre_girador":null,"taller_origen":null,"color":null,"piezas":[{"nombre":"","lado":"N/A","requiere_reparacion":false,"requiere_pintura":false,"es_faro":false,"requiere_pulido":false,"tipo_trabajo":null}]}`
 
@@ -122,7 +101,10 @@ export async function POST(request: NextRequest) {
           content: [
             {
               type: 'image_url',
-              image_url: { url: `data:${file.type};base64,${base64}`, detail: 'high' }
+              image_url: {
+                url: `data:${file.type};base64,${base64}`,
+                detail: 'high'
+              }
             },
             { type: 'text', text: PROMPT }
           ]
