@@ -27,15 +27,54 @@ PLACA (CRITICA)
 Buscar en TODO el documento. Formato ABC123 o ABC-123. Cerca de VIN, Marca, Modelo, Rodaje. Si hay valor probable usarlo.
 
 ========================
-GIRADOR
+GIRADOR (CRITICO)
 ========================
-Buscar nombre junto a: Tecnico, Perito, Asesor, Ajustador, Inspector, Responsable, Autorizado, VoBo, Realizado por, Nombre Usuario, firma.
+El girador es la persona que EMITE o AUTORIZA la orden.
+
+Prioridad obligatoria:
+1. Nombre junto a firma inferior con cargo (Tecnico, Perito, Asesor de seguros) ← MÁS IMPORTANTE
+2. "Autorizado por"
+3. "Tecnico"
+4. "Perito"
+5. "Asesor"
+6. "Realizado por"
+7. "VoBo"
+
+REGLAS:
+- Elegir el nombre con mayor jerarquia, no el primero que aparezca
+- Ignorar nombres dentro de:
+  - "Atencion"
+  - "a los señores"
+  - "Cliente"
+  - "Contacto"
+- Si hay firma con nombre debajo, ese es el girador principal
 
 ========================
-TALLER ORIGEN
+TALLER ORIGEN (CRITICO)
 ========================
-Prioridad: TALLER PRINCIPAL > ATENCION A TALLER > Cliente > "a los señores" > firma empresa inferior.
-IGNORAR REBIPLAST o Rafael Gonzales.
+El taller_origen es el lugar donde se ejecuta el trabajo, NO la aseguradora.
+
+Prioridad:
+1. "TALLER PRINCIPAL"
+2. "ATENCION A TALLER"
+3. Nombre después de "a los señores"
+4. "Cliente" (si es empresa/taller)
+5. Empresa en texto central o superior relacionada al servicio
+
+REGLAS:
+- NUNCA usar aseguradoras como taller:
+  - La Positiva
+  - Rimac
+  - Mapfre
+  - Pacifico
+  - Interseguro
+
+- NUNCA usar:
+  - Rebiplast
+  - Rafael Gonzales
+
+- Elegir empresa/taller, no persona
+- Si hay duda, elegir el nombre que recibe el trabajo
 
 ========================
 PIEZAS - SEPARACION OBLIGATORIA
