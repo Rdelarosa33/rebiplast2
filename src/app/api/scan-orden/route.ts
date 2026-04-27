@@ -51,6 +51,10 @@ GIRADOR (PRIORIDAD)
 Buscar nombre junto a: Técnico, Realizado por, Asesor, Inspector, Jefe de Taller, Autorizado, VoBo, Firma con nombre debajo.
 Elegir el nombre más claro.
 
+REGLAS:
+- IGNORAR "Rafael Gonzales o Gonzales"
+- Preferir Nombre de Persona
+
 ========================
 TALLER_ORIGEN (CRÍTICO)
 ========================
