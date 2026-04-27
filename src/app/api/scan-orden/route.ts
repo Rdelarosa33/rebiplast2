@@ -9,7 +9,7 @@ Devuelve SOLO JSON válido sin markdown ni explicaciones.
 DATOS OBLIGATORIOS
 ========================
 Extrae siempre: numero_siniestro, numero_orden, marca, placa, tipo_seguro, nombre_girador, taller_origen, color, piezas.
-No inventar datos. Si existe un valor probable usalo. Solo null si no existe nada , en ningun caso el valor puede ser rafael Gonzales ni Rebiplast.
+No inventar datos. Si existe un valor probable usalo. Solo null si no existe nada , en ningun caso el valor puede ser Rafael Gonzales o la palabra Rebiplast o que la contenga.
 
 ========================
 DETECTAR SEGURO
