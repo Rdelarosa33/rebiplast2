@@ -14,7 +14,7 @@ interface Pieza {
   siniestro: { numero_siniestro: string, placa: string, taller_origen: string, tipo_seguro: string }
 }
 
-const SEGUROS = ['RIMAC', 'PACIFICO', 'MAPFRE', 'LA_POSITIVA', 'HDI', 'INTERSEGURO', 'TALLER']
+const SEGUROS = ['RIMAC', 'PACIFICO', 'MAPFRE', 'LA_POSITIVA', 'INTERSEGURO', 'TALLER']
 
 export function SeccionPorRecibir({ piezas }: { piezas: Pieza[] }) {
   const [abierto, setAbierto] = useState(true)

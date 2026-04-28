@@ -297,11 +297,30 @@ export async function POST(request: NextRequest) {
     debugLog.push({ campo: 'monto', monto_total, moneda })
 
     // ── PASO 4: Cargar tablas de referencia ──
-    const [{ data: refAseg }, { data: refGir }, { data: refTall }] = await Promise.all([
-      supabase.from('ref_aseguradoras').select('variante, tipo, alias'),
-      supabase.from('ref_giradores').select('nombre, aseguradora, alias'),
-      supabase.from('ref_talleres').select('nombre, alias'),
+    // Selects defensivos: si la columna 'alias' no existe (versión vieja del schema),
+    // hacer fallback a select sin alias para no perder los demás campos
+    async function cargarRef(tabla: string, columnasConAlias: string, columnasSinAlias: string) {
+      const { data, error } = await supabase.from(tabla).select(columnasConAlias)
+      if (error || !data) {
+        // Fallback sin alias
+        const { data: data2 } = await supabase.from(tabla).select(columnasSinAlias)
+        return data2 || []
+      }
+      return data
+    }
+
+    const [refAseg, refGir, refTall] = await Promise.all([
+      cargarRef('ref_aseguradoras', 'variante, tipo, alias', 'variante, tipo'),
+      cargarRef('ref_giradores',    'nombre, aseguradora, alias', 'nombre, aseguradora'),
+      cargarRef('ref_talleres',     'nombre, alias', 'nombre'),
     ])
+
+    debugLog.push({
+      campo: 'tablas_cargadas',
+      aseguradoras: refAseg.length,
+      giradores: refGir.length,
+      talleres: refTall.length,
+    })
 
     // ── PASO 5: Match seguro ──
     const segCandidatos = [...(candidatos.seguros || []), data.tipo_seguro].filter(Boolean)
@@ -322,7 +341,7 @@ export async function POST(request: NextRequest) {
 
     // ── PASO 8: Inferir seguro desde girador si no se encontró ──
     let tipoSeguroFinal = segMatch.nombre
-      ? (refAseg?.find(a => a.variante === segMatch.nombre)?.tipo || data.tipo_seguro)
+      ? (refAseg?.find((a: any) => a.variante === segMatch.nombre)?.tipo || data.tipo_seguro)
       : data.tipo_seguro
 
     if (!tipoSeguroFinal && girMatch.nombre) {
@@ -346,7 +365,46 @@ export async function POST(request: NextRequest) {
     if (extra.observaciones_orden) partsObs.push(`Obs: ${extra.observaciones_orden}`)
     const observaciones = partsObs.length > 0 ? partsObs.join(' | ') : null
 
+    // ── PASO 9.5: Sanear piezas (GPT a veces devuelve strings en lugar de booleanos) ──
+    const toBool = (v: any): boolean => {
+      if (typeof v === 'boolean') return v
+      if (typeof v === 'string') {
+        const s = v.toUpperCase().trim()
+        return s !== '' && s !== 'FALSE' && s !== 'NO' && s !== 'NULL' && s !== 'N/A'
+      }
+      return !!v
+    }
+    const piezasSaneadas = (data.piezas || []).map((p: any) => {
+      const requiere_reparacion = toBool(p.requiere_reparacion)
+      const requiere_pintura = toBool(p.requiere_pintura)
+      const es_faro = toBool(p.es_faro)
+      const requiere_pulido = toBool(p.requiere_pulido)
+      // Recalcular tipo_trabajo desde flags saneados (consistencia)
+      let tipo_trabajo = 'R'
+      if (!requiere_reparacion && !requiere_pintura && requiere_pulido) tipo_trabajo = 'PU'
+      else if (requiere_reparacion && requiere_pintura && requiere_pulido) tipo_trabajo = 'RPP'
+      else if (requiere_reparacion && requiere_pintura) tipo_trabajo = 'RP'
+      else if (requiere_reparacion) tipo_trabajo = 'R'
+      return {
+        nombre: p.nombre || '',
+        lado: p.lado || 'N/A',
+        requiere_reparacion,
+        requiere_pintura,
+        es_faro,
+        requiere_pulido,
+        tipo_trabajo,
+        precio: p.precio || null,
+        observaciones: p.observaciones || null,
+      }
+    })
+
     // ── PASO 10: Construir resultado final ──
+    // Taller: priorizar match en tabla, pero si GPT leyó un nombre no prohibido, usarlo como fallback
+    let tallerFinal: string | null = tallMatch.nombre || null
+    if (!tallerFinal && data.taller_origen && !estaProhibido(data.taller_origen)) {
+      tallerFinal = data.taller_origen
+    }
+
     const output: any = {
       numero_siniestro: data.numero_siniestro || null,
       numero_orden: data.numero_orden || null,
@@ -355,15 +413,15 @@ export async function POST(request: NextRequest) {
       color: data.color || null,
       tipo_seguro: tipoSeguroFinal || null,
       nombre_girador: girMatch.nombre || (!estaProhibido(data.nombre_girador || '') ? data.nombre_girador : null),
-      taller_origen: tallMatch.nombre || null, // solo tabla, no fallback GPT
+      taller_origen: tallerFinal,
       monto_total,
       moneda,
       observaciones,
-      piezas: data.piezas || [],
+      piezas: piezasSaneadas,
       confianza: {
         seguro: segMatch.fuente,
         girador: girMatch.fuente,
-        taller: tallMatch.fuente,
+        taller: tallMatch.fuente || (tallerFinal ? 'gpt' : null),
       }
     }
 

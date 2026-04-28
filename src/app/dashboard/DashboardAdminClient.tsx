@@ -7,7 +7,7 @@ import Link from 'next/link'
 
 const COLORES_SEGURO: Record<string, string> = {
   RIMAC: '#00D4FF', MAPFRE: '#FF4444', PACIFICO: '#00C851',
-  LA_POSITIVA: '#FF8800', HDI: '#8B5CF6', INTERSEGURO: '#EC4899', TALLER: '#94A3B8', OTRO: '#475569'
+  LA_POSITIVA: '#FF8800', INTERSEGURO: '#EC4899', TALLER: '#94A3B8', OTRO: '#475569'
 }
 
 const PIPELINE_LABELS: Record<string, string> = {

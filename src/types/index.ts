@@ -14,7 +14,7 @@ export type PiezaEstado =
   | 'ENTREGADO'
   | 'DEVUELTO'
 
-export type SeguroTipo = 'RIMAC' | 'PACIFICO' | 'MAPFRE' | 'LA_POSITIVA' | 'HDI' | 'INTERSEGURO' | 'TALLER' | 'OTRO'
+export type SeguroTipo = 'RIMAC' | 'PACIFICO' | 'MAPFRE' | 'LA_POSITIVA' | 'INTERSEGURO' | 'TALLER' | 'OTRO'
 
 export interface Profile {
   id: string
@@ -149,7 +149,7 @@ export const ROLE_COLOR: Record<UserRole, string> = {
   owner: 'bg-yellow-500/20 text-yellow-300',
 }
 
-export const SEGUROS: SeguroTipo[] = ['RIMAC', 'PACIFICO', 'MAPFRE', 'LA_POSITIVA', 'HDI', 'INTERSEGURO', 'TALLER', 'OTRO']
+export const SEGUROS: SeguroTipo[] = ['RIMAC', 'PACIFICO', 'MAPFRE', 'LA_POSITIVA', 'INTERSEGURO', 'TALLER', 'OTRO']
 
 // ================================================
 // ACCIONES POR ROL — LÓGICA ESTRICTA

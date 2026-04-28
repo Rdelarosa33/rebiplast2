@@ -4,7 +4,7 @@ import { ESTADO_COLOR, ESTADO_LABELS, PiezaEstado } from '@/types'
 import { Plus } from 'lucide-react'
 import InfoSiniestro from '@/app/dashboard/InfoSiniestro'
 
-const SEGUROS = ['RIMAC','PACIFICO','MAPFRE','LA_POSITIVA','HDI','INTERSEGURO','TALLER']
+const SEGUROS = ['RIMAC','PACIFICO','MAPFRE','LA_POSITIVA','INTERSEGURO','TALLER']
 
 const ESTADO_PRIORIDAD: Record<string, number> = {
   ENTREGADO: 11, LISTO_ENTREGA: 10, CONTROL_CALIDAD: 9,
