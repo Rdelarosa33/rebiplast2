@@ -299,7 +299,7 @@ export async function POST(request: NextRequest) {
     // ── PASO 4: Cargar tablas de referencia ──
     // Selects defensivos: si la columna 'alias' no existe (versión vieja del schema),
     // hacer fallback a select sin alias para no perder los demás campos
-    async function cargarRef(tabla: string, columnasConAlias: string, columnasSinAlias: string) {
+    const cargarRef = async (tabla: string, columnasConAlias: string, columnasSinAlias: string) => {
       const { data, error } = await supabase.from(tabla).select(columnasConAlias)
       if (error || !data) {
         // Fallback sin alias
