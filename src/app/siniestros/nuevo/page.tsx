@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { crearSiniestro } from '@/lib/actions'
-import { SEGUROS } from '@/types'
+import { SEGUROS, getTipoTrabajo, getTipoTrabajoDescripcion } from '@/types'
 import { Plus, Trash2, ArrowLeft, ArrowRight, Check, Wrench, Paintbrush, Sparkles, Camera, Upload, Loader2, X, AlertCircle } from 'lucide-react'
 
 interface PiezaForm {
@@ -145,8 +145,17 @@ export default function NuevoSiniestroPage() {
   const updatePieza = (i: number, field: keyof PiezaForm, value: any) => {
     const updated = [...piezas]
     updated[i] = { ...updated[i], [field]: value }
+    // Si marca es_faro, auto-marca pulido + pintura
     if (field === 'es_faro' && value) { updated[i].requiere_pulido = true; updated[i].requiere_pintura = true }
-    updated[i].tipo_trabajo = updated[i].requiere_pintura ? 'RP' : 'R'
+    // Si desmarca es_faro, auto-quita pulido (pulido solo aplica a faros)
+    if (field === 'es_faro' && !value) { updated[i].requiere_pulido = false }
+    // Recalcular tipo_trabajo desde los flags actuales
+    updated[i].tipo_trabajo = getTipoTrabajo({
+      requiere_reparacion: updated[i].requiere_reparacion,
+      requiere_pintura: updated[i].requiere_pintura,
+      requiere_pulido: updated[i].requiere_pulido,
+      es_faro: updated[i].es_faro,
+    })
     setPiezas(updated)
   }
 
@@ -372,8 +381,7 @@ export default function NuevoSiniestroPage() {
               <div className="bg-[#131920] rounded-xl px-3 py-2 text-xs">
                 <span className="font-mono font-bold text-[#00D4FF]">{pieza.tipo_trabajo}</span>
                 <span className="text-[#475569] ml-2">
-                  {pieza.tipo_trabajo === 'RP' ? 'Rep + Prep + Pintura' : 'Solo reparación'}
-                  {pieza.es_faro ? ' + Pulido' : ''}
+                  {getTipoTrabajoDescripcion(pieza.tipo_trabajo)}
                 </span>
               </div>
             </div>

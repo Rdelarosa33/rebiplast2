@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { PiezaEstado, UserRole } from '@/types'
+import { PiezaEstado, UserRole, getTipoTrabajo, validarFlagsPieza } from '@/types'
 import { revalidatePath } from 'next/cache'
 
 export async function cambiarEstadoPieza(
@@ -89,9 +89,13 @@ export async function actualizarFlagsPieza(
     return { error: 'Sin permisos para editar flags' }
   }
 
+  // Validar combinación de flags antes de tocar BD
+  const errorValidacion = validarFlagsPieza(flags)
+  if (errorValidacion) return { error: errorValidacion }
+
   const { data: pieza } = await supabase
     .from('piezas')
-    .select('siniestro_id, estado, requiere_reparacion, requiere_pintura, requiere_pulido, es_faro')
+    .select('siniestro_id, estado, tipo_trabajo, requiere_reparacion, requiere_pintura, requiere_pulido, es_faro')
     .eq('id', piezaId)
     .single()
 
@@ -101,6 +105,9 @@ export async function actualizarFlagsPieza(
   if (!['EN_TRASLADO', 'RECIBIDO'].includes(pieza.estado)) {
     return { error: `No se pueden editar flags en estado ${pieza.estado}` }
   }
+
+  // Calcular tipo_trabajo nuevo (string visual) desde los booleanos
+  const tipoNuevo = getTipoTrabajo(flags)
 
   // Detectar cambios reales (opción C: solo registrar si cambió algo)
   const cambios: string[] = []
@@ -116,13 +123,16 @@ export async function actualizarFlagsPieza(
   if (pieza.es_faro !== flags.es_faro) {
     cambios.push(`Faro: ${pieza.es_faro ? 'sí' : 'no'} → ${flags.es_faro ? 'sí' : 'no'}`)
   }
+  if (pieza.tipo_trabajo !== tipoNuevo) {
+    cambios.push(`Código: ${pieza.tipo_trabajo || '?'} → ${tipoNuevo}`)
+  }
 
   // Si no hay cambios, no hacer nada
   if (cambios.length === 0) {
     return { success: true, sinCambios: true }
   }
 
-  // Actualizar pieza
+  // Actualizar pieza (incluye tipo_trabajo recalculado)
   const { error } = await supabase
     .from('piezas')
     .update({
@@ -130,6 +140,7 @@ export async function actualizarFlagsPieza(
       requiere_pintura: flags.requiere_pintura,
       requiere_pulido: flags.requiere_pulido,
       es_faro: flags.es_faro,
+      tipo_trabajo: tipoNuevo,
       updated_at: new Date().toISOString(),
     })
     .eq('id', piezaId)
@@ -153,7 +164,7 @@ export async function actualizarFlagsPieza(
   revalidatePath('/supervisor')
   revalidatePath(`/siniestros`)
 
-  return { success: true, cambios }
+  return { success: true, cambios, tipo_trabajo: tipoNuevo }
 }
 
 export async function asignarTrabajadores(

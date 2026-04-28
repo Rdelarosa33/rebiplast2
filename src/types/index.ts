@@ -282,3 +282,72 @@ export function getAcciones(estado: PiezaEstado, role: UserRole, pieza?: Partial
 
   return acciones
 }
+
+// ============================================================
+// CÁLCULO DE TIPO DE TRABAJO
+// ============================================================
+// Códigos visibles para el personal:
+//   R   = solo reparación
+//   RP  = reparación + pintura
+//   RPP = reparación + pintura + pulido (faro completo)
+//   PU  = solo pulido (faro solo opaco)
+//
+// Internamente el sistema usa los 4 booleanos para controlar el flujo
+// de estados. Esta función deriva el código string desde los booleanos.
+// ============================================================
+export interface FlagsPieza {
+  requiere_reparacion: boolean
+  requiere_pintura: boolean
+  requiere_pulido: boolean
+  es_faro: boolean
+}
+
+export function getTipoTrabajo(flags: FlagsPieza): string {
+  const { requiere_reparacion, requiere_pintura, requiere_pulido } = flags
+
+  // Solo pulido (faro opaco sin daño)
+  if (!requiere_reparacion && !requiere_pintura && requiere_pulido) return 'PU'
+
+  // Reparación + pintura + pulido
+  if (requiere_reparacion && requiere_pintura && requiere_pulido) return 'RPP'
+
+  // Reparación + pintura
+  if (requiere_reparacion && requiere_pintura) return 'RP'
+
+  // Solo reparación (default)
+  if (requiere_reparacion) return 'R'
+
+  // Caso raro: nada marcado → fallback a R
+  return 'R'
+}
+
+export function getTipoTrabajoDescripcion(codigo: string): string {
+  switch (codigo) {
+    case 'R': return 'Solo reparación'
+    case 'RP': return 'Reparación + Pintura'
+    case 'RPP': return 'Reparación + Pintura + Pulido'
+    case 'PU': return 'Solo pulido'
+    default: return codigo
+  }
+}
+
+export function validarFlagsPieza(flags: FlagsPieza): string | null {
+  const { requiere_reparacion, requiere_pintura, requiere_pulido, es_faro } = flags
+
+  // Al menos un trabajo debe estar marcado
+  if (!requiere_reparacion && !requiere_pintura && !requiere_pulido) {
+    return 'Debe marcar al menos un tipo de trabajo'
+  }
+
+  // Pulido solo en faros
+  if (requiere_pulido && !es_faro) {
+    return 'El pulido solo aplica a faros'
+  }
+
+  // Pintura sin reparación no aplica (excepto si es solo pulido)
+  if (requiere_pintura && !requiere_reparacion) {
+    return 'La pintura requiere reparación'
+  }
+
+  return null
+}

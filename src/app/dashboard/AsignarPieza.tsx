@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { cambiarEstadoPieza, actualizarFlagsPieza } from '@/lib/actions'
+import { getTipoTrabajo, getTipoTrabajoDescripcion, validarFlagsPieza } from '@/types'
 import { UserCheck, ChevronDown, Pencil, Check, X } from 'lucide-react'
 
 interface Trabajador {
@@ -50,6 +51,10 @@ export default function AsignarPieza({
   const [guardandoFlags, setGuardandoFlags] = useState(false)
   const [errorFlags, setErrorFlags] = useState('')
 
+  // Calcular tipo en vivo + validación
+  const tipoPreview = getTipoTrabajo(flags)
+  const errorValidacion = validarFlagsPieza(flags)
+
   const abrirEdicion = () => {
     setFlagsBackup(flags)
     setEditandoFlags(true)
@@ -60,6 +65,16 @@ export default function AsignarPieza({
     setFlags(flagsBackup)
     setEditandoFlags(false)
     setErrorFlags('')
+  }
+
+  // Lógica auxiliar: si desmarcas faro, también desmarca pulido
+  const setFlag = (campo: keyof FlagsIniciales, valor: boolean) => {
+    const nuevos = { ...flags, [campo]: valor }
+    // Si desmarca es_faro, también quita pulido
+    if (campo === 'es_faro' && !valor) nuevos.requiere_pulido = false
+    // Si marca pulido sin ser faro, marca faro automáticamente
+    if (campo === 'requiere_pulido' && valor && !nuevos.es_faro) nuevos.es_faro = true
+    setFlags(nuevos)
   }
 
   const guardarFlags = async () => {
@@ -105,39 +120,49 @@ export default function AsignarPieza({
   if (editandoFlags) {
     return (
       <div className="space-y-2 p-2 bg-[#0D1117] border border-[#1E2D42] rounded-lg">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs text-[#475569]">Editar tipo de trabajo</span>
+          <span
+            className="text-[10px] font-mono font-bold text-[#00D4FF] bg-[#131920] border border-[#1E2D42] px-1.5 py-0.5 rounded"
+            title={getTipoTrabajoDescripcion(tipoPreview)}
+          >
+            {tipoPreview}
+          </span>
+        </div>
         <div className="grid grid-cols-2 gap-2">
           <FlagCheckbox
             label="Reparación"
             checked={flags.requiere_reparacion}
-            onChange={v => setFlags({ ...flags, requiere_reparacion: v })}
+            onChange={v => setFlag('requiere_reparacion', v)}
             color="text-amber-400"
           />
           <FlagCheckbox
             label="Pintura"
             checked={flags.requiere_pintura}
-            onChange={v => setFlags({ ...flags, requiere_pintura: v })}
+            onChange={v => setFlag('requiere_pintura', v)}
             color="text-pink-400"
-          />
-          <FlagCheckbox
-            label="Pulido"
-            checked={flags.requiere_pulido}
-            onChange={v => setFlags({ ...flags, requiere_pulido: v })}
-            color="text-rose-400"
           />
           <FlagCheckbox
             label="Faro"
             checked={flags.es_faro}
-            onChange={v => setFlags({ ...flags, es_faro: v })}
+            onChange={v => setFlag('es_faro', v)}
             color="text-cyan-400"
           />
+          <FlagCheckbox
+            label="Pulido"
+            checked={flags.requiere_pulido}
+            onChange={v => setFlag('requiere_pulido', v)}
+            color="text-rose-400"
+            disabled={!flags.es_faro}
+          />
         </div>
-        {errorFlags && (
-          <p className="text-xs text-red-400">{errorFlags}</p>
+        {(errorValidacion || errorFlags) && (
+          <p className="text-xs text-red-400">{errorFlags || errorValidacion}</p>
         )}
         <div className="flex gap-2">
           <button
             onClick={guardarFlags}
-            disabled={guardandoFlags}
+            disabled={guardandoFlags || !!errorValidacion}
             className="flex-1 text-xs bg-[#00D4FF] text-[#080B12] font-semibold px-3 py-1.5 rounded-lg disabled:opacity-50 flex items-center justify-center gap-1"
           >
             <Check size={12} />
@@ -172,7 +197,7 @@ export default function AsignarPieza({
       </div>
       <button
         onClick={abrirEdicion}
-        title="Editar Rep/Pin/Pul/Faro"
+        title="Editar tipo de trabajo"
         className="text-xs bg-[#131920] border border-[#1E2D42] text-[#94A3B8] hover:text-[#00D4FF] hover:border-[#00D4FF] px-2 py-1.5 rounded-lg flex-shrink-0"
       >
         <Pencil size={12} />
@@ -190,17 +215,20 @@ function FlagCheckbox({
   checked,
   onChange,
   color,
+  disabled,
 }: {
   label: string
   checked: boolean
   onChange: (v: boolean) => void
   color: string
+  disabled?: boolean
 }) {
   return (
-    <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
+    <label className={`flex items-center gap-2 text-xs select-none ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}>
       <input
         type="checkbox"
         checked={checked}
+        disabled={disabled}
         onChange={e => onChange(e.target.checked)}
         className="w-3.5 h-3.5 rounded border-[#1E2D42] bg-[#0D1117] text-[#00D4FF] focus:ring-0 focus:ring-offset-0"
       />
