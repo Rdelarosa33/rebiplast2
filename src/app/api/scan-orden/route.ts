@@ -686,18 +686,23 @@ export async function POST(request: NextRequest) {
     const tallMatch = matchConLista(tallCandidatos, refTall || [], 'nombre')
     debugLog.push({ campo: 'taller', detectado: data.taller_origen, candidatos: entidadesUnif, match: tallMatch.nombre, fuente: tallMatch.fuente })
 
-    // ── PASO 8: Inferir seguro desde girador si no se encontró ──
-    let tipoSeguroFinal = segMatch.nombre
-      ? (refAseg?.find((a: any) => a.variante === segMatch.nombre)?.tipo || data.tipo_seguro)
-      : data.tipo_seguro
+    // ── PASO 8: tipo_seguro - el usuario MANDA, no se sobrescribe ──
+    // El usuario ya eligió el tipo antes de subir la foto.
+    // Solo cambiamos si: usuario eligió TALLER y GPT detectó una aseguradora real
+    // (en cuyo caso tomamos lo que GPT detectó).
+    let tipoSeguroFinal: string = tipoSeleccionado
 
-    if (!tipoSeguroFinal && girMatch.nombre) {
-      const girReg = refGir?.find((g: any) => g.nombre === girMatch.nombre)
-      if (girReg?.aseguradora && girReg.aseguradora !== 'TALLER') {
-        tipoSeguroFinal = girReg.aseguradora
-        debugLog.push({ campo: 'seguro_inferido', desde: 'girador', valor: tipoSeguroFinal })
+    if (tipoSeleccionado === 'TALLER') {
+      // Usuario no sabía qué era, dejamos que GPT decida
+      const detectado = (data.tipo_seguro_detectado || '').toUpperCase().trim()
+      if (detectado && detectado !== 'TALLER' &&
+          ['RIMAC', 'MAPFRE', 'PACIFICO', 'LA_POSITIVA', 'INTERSEGURO'].includes(detectado)) {
+        tipoSeguroFinal = detectado
+        debugLog.push({ campo: 'seguro_inferido', desde: 'gpt_detectado', valor: tipoSeguroFinal })
       }
     }
+    // Si usuario eligió una aseguradora específica (RIMAC, MAPFRE, etc.) → mantener su elección
+    // Esto evita que el sistema "infiera" otra aseguradora desde el girador o BD
 
     // ── PASO 9: Construir observaciones concatenadas ──
     const extra = data.datos_extra || {}
@@ -748,20 +753,26 @@ export async function POST(request: NextRequest) {
 
     // ── PASO 10: Construir resultado final ──
     // Estrategia para taller y girador:
-    // - El valor PRINCIPAL es lo que GPT detectó (siempre que no sea Rebiplast/Rafael)
-    // - BD solo se usa como valor principal si el match es EXACTO
+    // - Si GPT dejó NULL → respetar (no inventar con BD)
+    // - Si GPT detectó algo → usar GPT como principal (no permitir que BD lo pise)
+    // - BD solo gana si el match es EXACTO con lo que GPT detectó
     // - Los matches BD parciales se ofrecen como SUGERENCIAS al usuario, no se imponen
 
     const elegirPrincipal = (matchNombre: string, matchFuente: any, gptValor: string | null): string | null => {
-      // Si match es exacto o por alias exacto, usar BD (es lo más confiable)
-      if (matchFuente === 'tabla_exacta' || matchFuente === 'tabla_alias') {
-        if (matchNombre && !estaProhibido(matchNombre)) return matchNombre
+      // Si GPT no detectó nada → null (NO inventar con BD)
+      if (!gptValor) return null
+
+      // Si lo detectado es prohibido (Rebiplast/Rafael) → null
+      if (estaProhibido(gptValor)) return null
+
+      // Si match es exacto Y coincide con lo de GPT → usar BD (caso ideal de normalización)
+      if ((matchFuente === 'tabla_exacta' || matchFuente === 'tabla_alias') &&
+          matchNombre && !estaProhibido(matchNombre)) {
+        return matchNombre
       }
-      // En cualquier otro caso, usar GPT (lo que vio en la imagen)
-      if (gptValor && !estaProhibido(gptValor)) return gptValor
-      // Fallback: si GPT no detectó pero hay match BD, usar match
-      if (matchNombre && !estaProhibido(matchNombre)) return matchNombre
-      return null
+
+      // Default: lo que GPT vio en la imagen
+      return gptValor
     }
 
     const tallerFinal = elegirPrincipal(tallMatch.nombre, tallMatch.fuente, data.taller_origen)
@@ -810,8 +821,24 @@ export async function POST(request: NextRequest) {
     // Filtrar entidades para quitar prohibidos
     const entidadesFiltradas = entidadesUnif.filter((e: string) => !estaProhibido(e))
 
+    // Para girador: filtrar también el nombre del asegurado
+    // (el asegurado es el cliente final, NUNCA es girador)
+    const nombreAsegurado = data.datos_extra?.nombre_asegurado || ''
+    const entidadesParaGirador = entidadesFiltradas.filter((e: string) => {
+      if (!nombreAsegurado) return true
+      const norm = normalizar(e)
+      const normAseg = normalizar(nombreAsegurado)
+      // Si la entidad es exactamente el asegurado o lo contiene casi todo, filtrarla
+      if (norm === normAseg) return false
+      // Filtrar también nombres parciales del asegurado (ej: "LEON" si el asegurado es "PAREDES LEON TABATHA")
+      const palabrasAseg = normAseg.split(' ').filter(p => p.length > 3)
+      const palabrasEnt = norm.split(' ').filter(p => p.length > 3)
+      if (palabrasEnt.length > 0 && palabrasEnt.every(p => palabrasAseg.includes(p))) return false
+      return true
+    })
+
     // Lista de candidatos para girador y taller (cada uno con su match BD relevante)
-    const candidatosGirador = construirCandidatos(giradorFinal, entidadesFiltradas, girMatch.nombre)
+    const candidatosGirador = construirCandidatos(giradorFinal, entidadesParaGirador, girMatch.nombre)
     const candidatosTaller = construirCandidatos(tallerFinal, entidadesFiltradas, tallMatch.nombre)
 
     // Para retrocompatibilidad: lista combinada de entidades (sin duplicados)
@@ -843,7 +870,7 @@ export async function POST(request: NextRequest) {
       marca: data.marca || null,
       placa: data.placa || null,
       color: data.color || null,
-      tipo_seguro: tipoSeguroFinal || tipoSeleccionado,  // Default al elegido por usuario
+      tipo_seguro: tipoSeguroFinal,  // Respeta lo que usuario eligió, salvo TALLER inferido
       tipo_seguro_seleccionado: tipoSeleccionado,
       tipo_seguro_detectado: tipoDetectadoGPT || null,
       alerta_tipo_seguro: alertaTipoSeguro,  // Avisar al frontend si hay mismatch
