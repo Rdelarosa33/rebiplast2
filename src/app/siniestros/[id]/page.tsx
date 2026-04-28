@@ -6,6 +6,7 @@ import { ArrowLeft, QrCode, Clock, CheckCircle, Printer } from 'lucide-react'
 import PiezaAcciones from './PiezaAcciones'
 import BotonQR from './BotonQR'
 import AsignarPiezaDetalle from './AsignarPiezaDetalle'
+import TrabajadoresAsignados from './TrabajadoresAsignados'
 import InfoSiniestro from '@/app/dashboard/InfoSiniestro'
 
 export default async function SiniestroDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -132,9 +133,10 @@ export default async function SiniestroDetailPage({ params }: { params: Promise<
                    (pieza.estado === 'RECIBIDO' || (pieza.estado === 'ASIGNADO' && !pieza.trabajador_reparacion_id)) && (
                     <AsignarPiezaDetalle piezaId={pieza.id} trabajadores={trabajadores} />
                   )}
-                  {pieza.trabajador_reparacion_nombre && (
-                    <p className="text-xs text-amber-400 mt-1">👤 {pieza.trabajador_reparacion_nombre}</p>
-                  )}
+                  <TrabajadoresAsignados
+                    pieza={pieza}
+                    puedeReasignar={profile?.role === 'supervisor' || profile?.role === 'admin'}
+                  />
                 </div>
               </div>
             </div>

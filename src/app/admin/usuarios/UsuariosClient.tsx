@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Users, Plus, Edit2, Power, X, Check, ChevronDown } from 'lucide-react'
+import { Users, Plus, Edit2, Power, X, Check, ChevronDown, RefreshCw } from 'lucide-react'
 import { ROLE_LABELS, ROLE_COLOR, UserRole } from '@/types'
+import ReasignarMasivoModal from './ReasignarMasivoModal'
 
 const ROLES: UserRole[] = ['admin', 'supervisor', 'trabajador', 'recojo']
 
@@ -20,6 +21,7 @@ export default function UsuariosClient({ usuarios }: { usuarios: Usuario[] }) {
   const [lista, setLista] = useState(usuarios)
   const [modalAgregar, setModalAgregar] = useState(false)
   const [modalEditar, setModalEditar] = useState<Usuario | null>(null)
+  const [modalReasignarMasivo, setModalReasignarMasivo] = useState<Usuario | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -147,6 +149,16 @@ export default function UsuariosClient({ usuarios }: { usuarios: Usuario[] }) {
               </div>
             </div>
             <div className="flex gap-2 flex-shrink-0">
+              {/* Reasignar piezas: solo para trabajadores activos */}
+              {u.activo && ['trabajador', 'recojo_trabajador'].includes(u.role) && (
+                <button
+                  onClick={() => setModalReasignarMasivo(u)}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors"
+                  title="Reasignar todas sus piezas a otro trabajador"
+                >
+                  <RefreshCw size={14} />
+                </button>
+              )}
               <button onClick={() => abrirEditar(u)}
                 className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#131920] text-[#475569] hover:text-white transition-colors">
                 <Edit2 size={14} />
@@ -258,6 +270,20 @@ export default function UsuariosClient({ usuarios }: { usuarios: Usuario[] }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal Reasignación Masiva */}
+      {modalReasignarMasivo && (
+        <ReasignarMasivoModal
+          trabajador={modalReasignarMasivo}
+          otrosTrabajadores={lista.filter(u =>
+            u.id !== modalReasignarMasivo.id &&
+            u.activo &&
+            ['trabajador', 'recojo_trabajador'].includes(u.role)
+          )}
+          onClose={() => setModalReasignarMasivo(null)}
+          onSuccess={() => setModalReasignarMasivo(null)}
+        />
       )}
     </div>
   )
