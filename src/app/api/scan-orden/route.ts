@@ -494,18 +494,19 @@ function parsearGPT(text: string): any {
 async function optimizarImagen(bytes: ArrayBuffer): Promise<{ base64: string; mimeType: string }> {
   try {
     const sharp = (await import('sharp')).default
+    // PIPELINE MÍNIMO - sin alterar la imagen
+    // - rotate(): corrige orientación si la foto fue tomada en vertical (EXIF)
+    // - resize: solo si es muy grande, para no gastar tokens innecesarios
+    // - JPEG calidad 90: alta calidad, sin artefactos de compresión
+    // NO se aplica: grayscale, normalize, linear, sharpen (la IA recibe la imagen tal cual)
     const optimized = await sharp(Buffer.from(bytes))
-      .rotate()                                       // Auto-rotar según EXIF (corrige fotos verticales)
-      .grayscale()                                    // A escala de grises (texto B/N en órdenes)
-      .normalize()                                    // Estira rango tonal (oscurece negros, aclara blancos)
-      .linear(1.4, -40)                               // Aumenta contraste (multiplicador, offset)
-      .sharpen(1.0)                                   // Realza bordes para texto desvaído
-      .resize({ width: 800, withoutEnlargement: true }) // Resize a 800px (~60% menos tokens vs 1200)
-      .jpeg({ quality: 75, mozjpeg: true })           // Subido a 75 para conservar más detalle del contraste
+      .rotate()                                          // Auto-rotar según EXIF
+      .resize({ width: 1600, withoutEnlargement: true }) // Resize solo si es mayor a 1600px
+      .jpeg({ quality: 90, mozjpeg: true })              // Calidad alta, sin pérdida visible
       .toBuffer()
     return { base64: optimized.toString('base64'), mimeType: 'image/jpeg' }
   } catch {
-    // Si sharp no está disponible, usar imagen original
+    // Si sharp no está disponible, usar imagen original sin modificaciones
     return { base64: Buffer.from(bytes).toString('base64'), mimeType: 'image/jpeg' }
   }
 }

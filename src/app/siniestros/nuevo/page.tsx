@@ -63,30 +63,35 @@ export default function NuevoSiniestroPage() {
 
   const [piezas, setPiezas] = useState<PiezaForm[]>([{ ...PIEZA_VACIA }])
 
+  // Solo limita el tamaño si es muy grande (>3000px), pero NO altera color/contraste
+  // La imagen va al servidor tal cual, GPT recibe la imagen real
   const mejorarImagen = (file: File): Promise<Blob> => {
     return new Promise((resolve) => {
+      // Si el archivo es < 3MB y caben en memoria sin problemas, mandar tal cual
+      if (file.size < 3 * 1024 * 1024) {
+        resolve(file)
+        return
+      }
+      // Si es muy grande, redimensionar (sin tocar color ni contraste)
       const img = new Image()
       const url = URL.createObjectURL(file)
       img.onload = () => {
-        const escala = img.width < 1200 ? 1200 / img.width : 1
+        const maxDim = 2400
+        const ladoMayor = Math.max(img.width, img.height)
+        const escala = ladoMayor > maxDim ? maxDim / ladoMayor : 1
         const w = Math.round(img.width * escala)
         const h = Math.round(img.height * escala)
         const canvas = document.createElement('canvas')
-        canvas.width = w; canvas.height = h
+        canvas.width = w
+        canvas.height = h
         const ctx = canvas.getContext('2d')!
         ctx.drawImage(img, 0, 0, w, h)
-        const imageData = ctx.getImageData(0, 0, w, h)
-        const data = imageData.data
-        const factor = 1.6
-        const intercept = 128 * (1 - factor)
-        for (let i = 0; i < data.length; i += 4) {
-          const gris = data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114
-          const val = Math.min(255, Math.max(0, gris * factor + intercept))
-          data[i] = val; data[i+1] = val; data[i+2] = val
-        }
-        ctx.putImageData(imageData, 0, 0)
         URL.revokeObjectURL(url)
-        canvas.toBlob((blob) => resolve(blob!), 'image/jpeg', 0.95)
+        canvas.toBlob((blob) => resolve(blob || file), 'image/jpeg', 0.92)
+      }
+      img.onerror = () => {
+        URL.revokeObjectURL(url)
+        resolve(file)
       }
       img.src = url
     })
