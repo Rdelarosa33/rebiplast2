@@ -230,8 +230,23 @@ NO incluir:
 - Rebiplast / Rebiplast EIRL
 - Aseguradoras conocidas (esas van en candidatos.seguros)
 
-El usuario elegirá manualmente cuál es girador y cuál taller. Tu trabajo
-es extraer TODO sin omitir, incluso si crees que algunos no aplican.
+candidatos.numeros_documento: lista de TODOS los números identificadores
+visibles en el documento (siniestro, orden, caso, póliza, expediente, folio, etc).
+NO incluir RUCs (los RUCs son fáciles de identificar por tener 11 dígitos
+y empezar con 10/15/17/20, esos los ignoras).
+SÍ incluir:
+- "1013189" (siniestro)
+- "0000129446" (OC)
+- "4217272" (caso)
+- "533674" (póliza)
+- "OTR20262294" (orden)
+- "69-009554" (con guión)
+- Cualquier otro número que parezca identificador
+
+Ejemplo de candidatos.numeros_documento para una orden RIMAC:
+["0000129446", "4217272", "1013189", "533674"]
+
+El usuario elegirá manualmente cuál es siniestro y cuál es orden.
 
 Ejemplo de candidatos.entidades para una orden RIMAC:
 ["Toyo Service", "SAN MIGUEL", "Pedro Agrado Munives", "Gianfranco Alberto Lopez Burga"]
@@ -379,7 +394,8 @@ ESTRUCTURA JSON DE RESPUESTA
   },
   "candidatos": {
     "seguros": [],
-    "entidades": []
+    "entidades": [],
+    "numeros_documento": []
   },
   "piezas": [
     {
@@ -724,6 +740,7 @@ export async function POST(request: NextRequest) {
       candidatos: {
         seguros: candidatos.seguros || [],
         entidades: entidadesUnif,  // Lista única de personas y empresas
+        numeros_documento: candidatos.numeros_documento || [],  // Lista única de números visibles
       },
       confianza: {
         seguro: segMatch.fuente,

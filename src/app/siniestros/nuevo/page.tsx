@@ -38,7 +38,7 @@ export default function NuevoSiniestroPage() {
   const [imagenPreview, setImagenPreview] = useState<string | null>(null)
   const [formKey, setFormKey] = useState(0)
   const [scanResult, setScanResult] = useState<{ data?: any; debug?: any[]; gpt_raw?: string } | null>(null)
-  const [candidatos, setCandidatos] = useState<{ seguros: string[]; entidades: string[] }>({ seguros: [], entidades: [] })
+  const [candidatos, setCandidatos] = useState<{ seguros: string[]; entidades: string[]; numeros_documento: string[] }>({ seguros: [], entidades: [], numeros_documento: [] })
   const [camposDetectados, setCamposDetectados] = useState<{ tipo_seguro: boolean; nombre_girador: boolean; taller_origen: boolean }>({ tipo_seguro: false, nombre_girador: false, taller_origen: false })
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
@@ -108,6 +108,7 @@ export default function NuevoSiniestroPage() {
       setCandidatos({
         seguros: d.candidatos?.seguros || [],
         entidades: d.candidatos?.entidades || [],
+        numeros_documento: d.candidatos?.numeros_documento || [],
       })
       // Marcar qué campos detectó el OCR (vs cuáles vienen vacíos)
       setCamposDetectados({
@@ -202,7 +203,7 @@ export default function NuevoSiniestroPage() {
   const limpiarFormulario = () => {
     setImagenPreview(null)
     setScanResult(null)
-    setCandidatos({ seguros: [], entidades: [] })
+    setCandidatos({ seguros: [], entidades: [], numeros_documento: [] })
     setCamposDetectados({ tipo_seguro: false, nombre_girador: false, taller_origen: false })
     setFormKey(k => k + 1)
     setForm({
@@ -300,10 +301,42 @@ export default function NuevoSiniestroPage() {
           <div key={formKey} className="card p-5 space-y-4">
             <h2 className="font-syne font-semibold text-white">Datos de la orden</h2>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className="label">N° Siniestro *</label>
-                <input className="input-field" value={form.numero_siniestro} onChange={e => setForm({...form, numero_siniestro: e.target.value})} placeholder="Ej: 100-130125001234" /></div>
-              <div><label className="label">N° Orden</label>
-                <input className="input-field" value={form.numero_orden} onChange={e => setForm({...form, numero_orden: e.target.value})} placeholder="Ej: 2025-01240189" /></div>
+              <div>
+                <label className="label">N° Siniestro *</label>
+                <input className="input-field" value={form.numero_siniestro} onChange={e => setForm({...form, numero_siniestro: e.target.value})} placeholder="Ej: 100-130125001234" />
+                {candidatos.numeros_documento.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-[9px] text-[#475569] mb-1">Detectados (click para usar):</p>
+                    <div className="flex flex-wrap gap-1">
+                      {candidatos.numeros_documento.slice(0, 8).map((c, i) => (
+                        <button key={i} type="button"
+                          onClick={() => setForm({...form, numero_siniestro: c})}
+                          className="text-[10px] font-mono bg-[#131920] border border-[#1E2D42] text-[#94A3B8] hover:text-[#00D4FF] hover:border-[#00D4FF]/50 rounded px-2 py-0.5">
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="label">N° Orden</label>
+                <input className="input-field" value={form.numero_orden} onChange={e => setForm({...form, numero_orden: e.target.value})} placeholder="Ej: 2025-01240189" />
+                {candidatos.numeros_documento.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-[9px] text-[#475569] mb-1">Detectados (click para usar):</p>
+                    <div className="flex flex-wrap gap-1">
+                      {candidatos.numeros_documento.slice(0, 8).map((c, i) => (
+                        <button key={i} type="button"
+                          onClick={() => setForm({...form, numero_orden: c})}
+                          className="text-[10px] font-mono bg-[#131920] border border-[#1E2D42] text-[#94A3B8] hover:text-[#00D4FF] hover:border-[#00D4FF]/50 rounded px-2 py-0.5">
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
           </div>
