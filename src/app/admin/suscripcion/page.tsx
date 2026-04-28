@@ -101,7 +101,7 @@ export default async function SuscripcionPage() {
             <p className="text-xs text-[#475569]">Gastado este mes</p>
           </div>
         </div>
-        <p className="text-[10px] text-[#475569] text-center mt-2">$0.30 por escaneo · Recarga automática $500 cuando saldo ≤ $5</p>
+        <p className="text-[10px] text-[#475569] text-center mt-2">$0.30 por escaneo · Recarga automática $50 cuando saldo ≤ $5</p>
         {(cred?.saldo || 0) < 10 && (
           <div className="mt-3 bg-orange-500/10 border border-orange-500/30 rounded-xl p-3">
             <p className="text-sm text-orange-400">⚠ Saldo bajo — quedan {Math.floor((cred?.saldo || 0) / 0.3)} escaneos disponibles</p>

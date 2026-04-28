@@ -261,9 +261,9 @@ export async function POST(request: NextRequest) {
 
     // ── PASO 1: Verificar/recargar saldo antes de procesar ──
     const { data: cred } = await supabase.from('creditos_ocr').select('id, saldo').single()
-    // Si el saldo es menor a $5, recargar automáticamente $500 (deuda registrada)
+    // Si el saldo es menor a $5, recargar automáticamente $50 (deuda registrada)
     if (cred && cred.saldo <= 5) {
-      const RECARGA_AUTO = 500
+      const RECARGA_AUTO = 50
       const saldoAnterior = cred.saldo
       const saldoNuevo = saldoAnterior + RECARGA_AUTO
       await supabase.from('creditos_ocr')
