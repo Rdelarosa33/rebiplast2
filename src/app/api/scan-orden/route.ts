@@ -194,15 +194,28 @@ datos_extra: expediente, poliza, vin, nombre_asegurado, telefono_asegurado,
 observaciones_orden.
 
 ═══════════════════════════════════════════════════════════════
-CANDIDATOS (lista todo lo que veas, aunque no estés 100% seguro)
+CANDIDATOS (lista TODO lo que veas, sin filtrar)
 ═══════════════════════════════════════════════════════════════
 
 candidatos.seguros: nombres de aseguradoras que aparezcan visibles
-candidatos.giradores: personas o empresas que podrían ser girador
-candidatos.talleres: empresas/talleres visibles (NUNCA Rebiplast)
 
-Esto sirve para que la app pueda mostrar opciones al usuario si la 
-extracción principal no está clara.
+candidatos.entidades: lista UNIFICADA de TODOS los nombres de personas Y empresas
+que aparezcan en el documento, EXCEPTO Rebiplast.
+Incluir SIEMPRE:
+- Nombres de personas (asegurados, peritos, técnicos, asesores, autorizados, firmantes)
+- Nombres de empresas (talleres, gestoras, agencias, contactos)
+- Nombres compuestos completos (ej: "Pedro Agrado Munives", "Alpiconsult S.A.C.")
+NO incluir:
+- Rebiplast / Rebiplast EIRL
+- Aseguradoras conocidas (esas van en candidatos.seguros)
+
+El usuario elegirá manualmente cuál es girador y cuál taller. Tu trabajo
+es extraer TODO sin omitir, incluso si crees que algunos no aplican.
+
+Ejemplo de candidatos.entidades para una orden RIMAC:
+["Toyo Service", "SAN MIGUEL", "Pedro Agrado Munives", "Gianfranco Alberto Lopez Burga"]
+
+Esto sirve para que la app pueda mostrar opciones al usuario.
 
 ═══════════════════════════════════════════════════════════════
 EXTRACCIÓN DE PIEZAS
@@ -229,6 +242,26 @@ REGLAS PARA FLAGS:
 - "PULIDO" → requiere_pulido = true
 - "FARO", "NEBLINERO" → es_faro = true
 - "REP+PINTURA", "RP", "Reparación + Pintura" → ambas (reparación + pintura)
+
+═══════════════════════════════════════════════════════════════
+MONTOS (importante: extraer SIEMPRE)
+═══════════════════════════════════════════════════════════════
+
+monto_total: el TOTAL del documento.
+- Buscar en: "TOTAL (US$)", "Precio Total S/", "TOTAL", "Monto Total", "Total a Facturar"
+- Es el SUBTOTAL si no hay TOTAL con IGV
+- Si el documento muestra montos en USD y soles, prioriza USD si está marcado "US$" o "Dólares Americanos"
+
+moneda: "USD" o "PEN" según corresponda.
+- Pistas USD: "US$", "Dólares", "Dólares Americanos", "$"
+- Pistas PEN: "S/", "Soles", "Nuevos Soles"
+
+monto por pieza: cada pieza puede tener su propio costo.
+- Buscar columna "PRECIO TOTAL", "Monto", "PRECIO", "Importe" al lado de cada descripción
+- Si una pieza no tiene precio individual claro, dejar monto = null
+- Si solo hay un total general (ej: 4 piezas comparten un solo monto $100), 
+  poner el total dividido entre las piezas en cada una, O dejar null y 
+  poner el total en monto_total únicamente
 
 LADOS:
 - "LH", "IZQ", "Izquierdo" → lado = "LH"
@@ -261,6 +294,8 @@ ESTRUCTURA JSON DE RESPUESTA
   "tipo_seguro": null,
   "nombre_girador": null,
   "taller_origen": null,
+  "monto_total": null,
+  "moneda": "USD",
   "datos_extra": {
     "expediente": null,
     "poliza": null,
@@ -273,8 +308,7 @@ ESTRUCTURA JSON DE RESPUESTA
   },
   "candidatos": {
     "seguros": [],
-    "giradores": [],
-    "talleres": []
+    "entidades": []
   },
   "piezas": [
     {
@@ -284,7 +318,8 @@ ESTRUCTURA JSON DE RESPUESTA
       "requiere_pintura": false,
       "es_faro": false,
       "requiere_pulido": false,
-      "tipo_trabajo": null
+      "tipo_trabajo": null,
+      "monto": null
     }
   ]
 }`
@@ -446,12 +481,26 @@ export async function POST(request: NextRequest) {
 
     const gptRaw = result.choices?.[0]?.message?.content || ''
     const data = parsearGPT(gptRaw)
-    const candidatos = data.candidatos || { seguros: [], giradores: [], talleres: [] }
+    const candidatos = data.candidatos || { seguros: [], entidades: [] }
 
-    // ── PASO 3: Extraer monto con regex ──
-    const textoCompleto = data.texto_completo || JSON.stringify(data)
-    const { monto_total, moneda } = extraerMonto(textoCompleto)
-    debugLog.push({ campo: 'monto', monto_total, moneda })
+    // ── PASO 3: Monto - priorizar el que GPT devuelve, si no, regex ──
+    let monto_total: number | null = null
+    let moneda: string = 'USD'
+    if (data.monto_total != null) {
+      const m = Number(data.monto_total)
+      if (!isNaN(m) && m > 0) {
+        monto_total = m
+        moneda = data.moneda || 'USD'
+      }
+    }
+    if (monto_total === null) {
+      // Fallback a regex sobre texto crudo de GPT
+      const textoCompleto = JSON.stringify(data)
+      const result = extraerMonto(textoCompleto)
+      monto_total = result.monto_total
+      moneda = result.moneda
+    }
+    debugLog.push({ campo: 'monto', monto_total, moneda, fuente: data.monto_total != null ? 'gpt' : 'regex' })
 
     // ── PASO 4: Cargar tablas de referencia ──
     // Selects defensivos: si la columna 'alias' no existe (versión vieja del schema),
@@ -484,17 +533,24 @@ export async function POST(request: NextRequest) {
     const segMatch = matchConLista(segCandidatos, refAseg || [], 'variante')
     debugLog.push({ campo: 'seguro', detectado: data.tipo_seguro, candidatos: candidatos.seguros, match: segMatch.nombre, fuente: segMatch.fuente })
 
-    // ── PASO 6: Match girador ──
-    const girCandidatos = [...(candidatos.giradores || []), data.nombre_girador].filter(Boolean)
-    const girMatch = matchConLista(girCandidatos, refGir || [], 'nombre')
-    debugLog.push({ campo: 'girador', detectado: data.nombre_girador, candidatos: candidatos.giradores, match: girMatch.nombre, fuente: girMatch.fuente })
+    // Entidades unificadas: GPT ahora devuelve TODOS los nombres de personas y empresas
+    // Si vino el formato viejo (giradores/talleres separados), los combinamos
+    const entidadesUnif = candidatos.entidades || [
+      ...(candidatos.giradores || []),
+      ...(candidatos.talleres || []),
+    ]
 
-    // ── PASO 7: Match taller ──
-    const tallCandidatos = [...(candidatos.talleres || []), data.taller_origen]
+    // ── PASO 6: Match girador (busca en entidades unificadas + lo detectado) ──
+    const girCandidatos = [...entidadesUnif, data.nombre_girador].filter(Boolean)
+    const girMatch = matchConLista(girCandidatos, refGir || [], 'nombre')
+    debugLog.push({ campo: 'girador', detectado: data.nombre_girador, candidatos: entidadesUnif, match: girMatch.nombre, fuente: girMatch.fuente })
+
+    // ── PASO 7: Match taller (busca en entidades unificadas + lo detectado) ──
+    const tallCandidatos = [...entidadesUnif, data.taller_origen]
       .filter(Boolean)
       .filter((t: string) => !estaProhibido(t))
     const tallMatch = matchConLista(tallCandidatos, refTall || [], 'nombre')
-    debugLog.push({ campo: 'taller', detectado: data.taller_origen, candidatos: candidatos.talleres, match: tallMatch.nombre, fuente: tallMatch.fuente })
+    debugLog.push({ campo: 'taller', detectado: data.taller_origen, candidatos: entidadesUnif, match: tallMatch.nombre, fuente: tallMatch.fuente })
 
     // ── PASO 8: Inferir seguro desde girador si no se encontró ──
     let tipoSeguroFinal = segMatch.nombre
@@ -551,6 +607,7 @@ export async function POST(request: NextRequest) {
         requiere_pulido,
         tipo_trabajo,
         precio: p.precio || null,
+        monto: p.monto != null ? Number(p.monto) : null,  // Monto por pieza
         observaciones: p.observaciones || null,
       }
     })
@@ -575,6 +632,10 @@ export async function POST(request: NextRequest) {
       moneda,
       observaciones,
       piezas: piezasSaneadas,
+      candidatos: {
+        seguros: candidatos.seguros || [],
+        entidades: entidadesUnif,  // Lista única de personas y empresas
+      },
       confianza: {
         seguro: segMatch.fuente,
         girador: girMatch.fuente,

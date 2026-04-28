@@ -38,7 +38,7 @@ export default function NuevoSiniestroPage() {
   const [imagenPreview, setImagenPreview] = useState<string | null>(null)
   const [formKey, setFormKey] = useState(0)
   const [scanResult, setScanResult] = useState<{ data?: any; debug?: any[]; gpt_raw?: string } | null>(null)
-  const [candidatos, setCandidatos] = useState<{ seguros: string[]; giradores: string[]; talleres: string[] }>({ seguros: [], giradores: [], talleres: [] })
+  const [candidatos, setCandidatos] = useState<{ seguros: string[]; entidades: string[] }>({ seguros: [], entidades: [] })
   const [camposDetectados, setCamposDetectados] = useState<{ tipo_seguro: boolean; nombre_girador: boolean; taller_origen: boolean }>({ tipo_seguro: false, nombre_girador: false, taller_origen: false })
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
@@ -107,8 +107,7 @@ export default function NuevoSiniestroPage() {
       // Guardar candidatos para sugerencias de UI
       setCandidatos({
         seguros: d.candidatos?.seguros || [],
-        giradores: d.candidatos?.giradores || [],
-        talleres: d.candidatos?.talleres || [],
+        entidades: d.candidatos?.entidades || [],
       })
       // Marcar qué campos detectó el OCR (vs cuáles vienen vacíos)
       setCamposDetectados({
@@ -149,7 +148,7 @@ export default function NuevoSiniestroPage() {
           requiere_pintura: p.requiere_pintura || false,
           requiere_pulido: p.requiere_pulido || false,
           tipo_trabajo: p.tipo_trabajo || 'R',
-          precio: p.precio ? String(p.precio) : '',
+          precio: p.monto != null ? String(p.monto) : (p.precio ? String(p.precio) : ''),
           observaciones: '',
         })))
       }
@@ -203,7 +202,7 @@ export default function NuevoSiniestroPage() {
   const limpiarFormulario = () => {
     setImagenPreview(null)
     setScanResult(null)
-    setCandidatos({ seguros: [], giradores: [], talleres: [] })
+    setCandidatos({ seguros: [], entidades: [] })
     setCamposDetectados({ tipo_seguro: false, nombre_girador: false, taller_origen: false })
     setFormKey(k => k + 1)
     setForm({
@@ -358,15 +357,18 @@ export default function NuevoSiniestroPage() {
                   )}
                 </label>
                 <input className="input-field" value={form.nombre_girador} onChange={e => setForm({...form, nombre_girador: e.target.value})} />
-                {candidatos.giradores.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {candidatos.giradores.slice(0, 4).map((c, i) => (
-                      <button key={i} type="button"
-                        onClick={() => setForm({...form, nombre_girador: c})}
-                        className="text-[10px] bg-[#131920] border border-[#1E2D42] text-[#94A3B8] hover:text-[#00D4FF] hover:border-[#00D4FF]/50 rounded px-2 py-0.5 truncate max-w-full">
-                        {c}
-                      </button>
-                    ))}
+                {candidatos.entidades.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-[9px] text-[#475569] mb-1">Detectados en la orden (click para usar):</p>
+                    <div className="flex flex-wrap gap-1">
+                      {candidatos.entidades.slice(0, 8).map((c, i) => (
+                        <button key={i} type="button"
+                          onClick={() => setForm({...form, nombre_girador: c})}
+                          className="text-[10px] bg-[#131920] border border-[#1E2D42] text-[#94A3B8] hover:text-[#00D4FF] hover:border-[#00D4FF]/50 rounded px-2 py-0.5 truncate max-w-full">
+                          {c}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -386,15 +388,18 @@ export default function NuevoSiniestroPage() {
                   )}
                 </label>
                 <input className="input-field" value={form.taller_origen} onChange={e => setForm({...form, taller_origen: e.target.value})} placeholder="Ej: Maquinarias SM" />
-                {candidatos.talleres.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {candidatos.talleres.slice(0, 4).map((c, i) => (
-                      <button key={i} type="button"
-                        onClick={() => setForm({...form, taller_origen: c})}
-                        className="text-[10px] bg-[#131920] border border-[#1E2D42] text-[#94A3B8] hover:text-[#00D4FF] hover:border-[#00D4FF]/50 rounded px-2 py-0.5 truncate max-w-full">
-                        {c}
-                      </button>
-                    ))}
+                {candidatos.entidades.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-[9px] text-[#475569] mb-1">Detectados en la orden (click para usar):</p>
+                    <div className="flex flex-wrap gap-1">
+                      {candidatos.entidades.slice(0, 8).map((c, i) => (
+                        <button key={i} type="button"
+                          onClick={() => setForm({...form, taller_origen: c})}
+                          className="text-[10px] bg-[#131920] border border-[#1E2D42] text-[#94A3B8] hover:text-[#00D4FF] hover:border-[#00D4FF]/50 rounded px-2 py-0.5 truncate max-w-full">
+                          {c}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -450,6 +455,8 @@ export default function NuevoSiniestroPage() {
                   </select></div>
                 <div><label className="label">Color</label>
                   <input className="input-field" value={pieza.color} onChange={e => updatePieza(i, 'color', e.target.value)} placeholder="NEGRO PP, COLOR..." /></div>
+                <div className="col-span-2"><label className="label">Monto ({form.moneda})</label>
+                  <input className="input-field" type="number" step="0.01" value={pieza.precio} onChange={e => updatePieza(i, 'precio', e.target.value)} placeholder="0.00" /></div>
               </div>
               <div className="flex gap-2 flex-wrap">
                 <label className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer transition-all ${pieza.requiere_reparacion ? 'bg-amber-500/20 border-amber-500/40 text-amber-300' : 'bg-[#131920] border-[#1E2D42] text-[#475569]'}`}>
