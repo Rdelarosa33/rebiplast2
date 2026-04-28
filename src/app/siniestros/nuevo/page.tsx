@@ -38,7 +38,13 @@ export default function NuevoSiniestroPage() {
   const [imagenPreview, setImagenPreview] = useState<string | null>(null)
   const [formKey, setFormKey] = useState(0)
   const [scanResult, setScanResult] = useState<{ data?: any; debug?: any[]; gpt_raw?: string } | null>(null)
-  const [candidatos, setCandidatos] = useState<{ seguros: string[]; entidades: string[]; numeros_documento: string[] }>({ seguros: [], entidades: [], numeros_documento: [] })
+  const [candidatos, setCandidatos] = useState<{
+    seguros: string[];
+    entidades: string[];
+    candidatos_girador: string[];
+    candidatos_taller: string[];
+    numeros_documento: string[]
+  }>({ seguros: [], entidades: [], candidatos_girador: [], candidatos_taller: [], numeros_documento: [] })
   const [camposDetectados, setCamposDetectados] = useState<{ tipo_seguro: boolean; nombre_girador: boolean; taller_origen: boolean }>({ tipo_seguro: false, nombre_girador: false, taller_origen: false })
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
@@ -108,6 +114,8 @@ export default function NuevoSiniestroPage() {
       setCandidatos({
         seguros: d.candidatos?.seguros || [],
         entidades: d.candidatos?.entidades || [],
+        candidatos_girador: d.candidatos?.candidatos_girador || d.candidatos?.entidades || [],
+        candidatos_taller: d.candidatos?.candidatos_taller || d.candidatos?.entidades || [],
         numeros_documento: d.candidatos?.numeros_documento || [],
       })
       // Marcar qué campos detectó el OCR (vs cuáles vienen vacíos)
@@ -203,7 +211,7 @@ export default function NuevoSiniestroPage() {
   const limpiarFormulario = () => {
     setImagenPreview(null)
     setScanResult(null)
-    setCandidatos({ seguros: [], entidades: [], numeros_documento: [] })
+    setCandidatos({ seguros: [], entidades: [], candidatos_girador: [], candidatos_taller: [], numeros_documento: [] })
     setCamposDetectados({ tipo_seguro: false, nombre_girador: false, taller_origen: false })
     setFormKey(k => k + 1)
     setForm({
@@ -390,11 +398,11 @@ export default function NuevoSiniestroPage() {
                   )}
                 </label>
                 <input className="input-field" value={form.nombre_girador} onChange={e => setForm({...form, nombre_girador: e.target.value})} />
-                {candidatos.entidades.length > 0 && (
+                {candidatos.candidatos_girador.length > 0 && (
                   <div className="mt-2">
                     <p className="text-[9px] text-[#475569] mb-1">Detectados en la orden (click para usar):</p>
                     <div className="flex flex-wrap gap-1">
-                      {candidatos.entidades.slice(0, 8).map((c, i) => (
+                      {candidatos.candidatos_girador.slice(0, 8).map((c, i) => (
                         <button key={i} type="button"
                           onClick={() => setForm({...form, nombre_girador: c})}
                           className="text-[10px] bg-[#131920] border border-[#1E2D42] text-[#94A3B8] hover:text-[#00D4FF] hover:border-[#00D4FF]/50 rounded px-2 py-0.5 truncate max-w-full">
@@ -421,11 +429,11 @@ export default function NuevoSiniestroPage() {
                   )}
                 </label>
                 <input className="input-field" value={form.taller_origen} onChange={e => setForm({...form, taller_origen: e.target.value})} placeholder="Ej: Maquinarias SM" />
-                {candidatos.entidades.length > 0 && (
+                {candidatos.candidatos_taller.length > 0 && (
                   <div className="mt-2">
                     <p className="text-[9px] text-[#475569] mb-1">Detectados en la orden (click para usar):</p>
                     <div className="flex flex-wrap gap-1">
-                      {candidatos.entidades.slice(0, 8).map((c, i) => (
+                      {candidatos.candidatos_taller.slice(0, 8).map((c, i) => (
                         <button key={i} type="button"
                           onClick={() => setForm({...form, taller_origen: c})}
                           className="text-[10px] bg-[#131920] border border-[#1E2D42] text-[#94A3B8] hover:text-[#00D4FF] hover:border-[#00D4FF]/50 rounded px-2 py-0.5 truncate max-w-full">

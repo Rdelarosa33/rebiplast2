@@ -22,12 +22,24 @@ function normalizar(texto: string): string {
 // ============================================================
 // BLOQUEO DURO
 // ============================================================
-const PROHIBIDOS = ['REBIPLAST', 'REIBPLAST', 'RAFAEL GONZALES', 'REBIPLAS']
+const PROHIBIDOS = [
+  'REBIPLAST',
+  'REIBPLAST',
+  'REBIPLAS',
+  'RAFAEL GONZALES',
+  'RAFAEL GONZALEZ',
+  'RAFAELGONZALES',
+  'RAFAEL GONZÁLES',
+  'RAFAEL GONZÁLEZ',
+]
 
 function estaProhibido(texto: string): boolean {
   if (!texto) return false
   const norm = normalizar(texto)
-  return PROHIBIDOS.some(p => norm.includes(p))
+  // Detectar también si contiene "rafael gonzal" (cubre Gonzales, Gonzalez, Gonzáles, etc.)
+  if (norm.includes('rafael gonzal')) return true
+  if (norm.includes('rebipla')) return true
+  return PROHIBIDOS.some(p => norm.includes(normalizar(p)))
 }
 
 // ============================================================
@@ -704,25 +716,82 @@ export async function POST(request: NextRequest) {
 
     // ── PASO 10: Construir resultado final ──
     // Estrategia para taller y girador:
-    // - Si GPT detectó un nombre claro (>= 4 chars) Y el match en BD es por "tabla_palabras"
-    //   (la fuente más débil), preferir lo que GPT detectó.
-    // - Si match es exacto/alias/parcial, usar BD.
-    // - Si no hay match pero GPT tiene algo válido, usar GPT.
+    // - El valor PRINCIPAL es lo que GPT detectó (siempre que no sea Rebiplast/Rafael)
+    // - BD solo se usa como valor principal si el match es EXACTO
+    // - Los matches BD parciales se ofrecen como SUGERENCIAS al usuario, no se imponen
 
-    const elegirMejor = (matchNombre: string, matchFuente: any, gptValor: string | null): string | null => {
-      // Si match es débil (palabras) y GPT tiene un valor más largo o específico, preferir GPT
-      if (matchFuente === 'tabla_palabras' && gptValor && gptValor.length >= 4 && !estaProhibido(gptValor)) {
-        return gptValor  // GPT vio algo claro, no confiamos en match débil
+    const elegirPrincipal = (matchNombre: string, matchFuente: any, gptValor: string | null): string | null => {
+      // Si match es exacto o por alias exacto, usar BD (es lo más confiable)
+      if (matchFuente === 'tabla_exacta' || matchFuente === 'tabla_alias') {
+        if (matchNombre && !estaProhibido(matchNombre)) return matchNombre
       }
-      // Si hay match (cualquier nivel), usarlo
-      if (matchNombre) return matchNombre
-      // Sin match: usar GPT si es válido
+      // En cualquier otro caso, usar GPT (lo que vio en la imagen)
       if (gptValor && !estaProhibido(gptValor)) return gptValor
+      // Fallback: si GPT no detectó pero hay match BD, usar match
+      if (matchNombre && !estaProhibido(matchNombre)) return matchNombre
       return null
     }
 
-    const tallerFinal = elegirMejor(tallMatch.nombre, tallMatch.fuente, data.taller_origen)
-    const giradorFinal = elegirMejor(girMatch.nombre, girMatch.fuente, data.nombre_girador)
+    const tallerFinal = elegirPrincipal(tallMatch.nombre, tallMatch.fuente, data.taller_origen)
+    const giradorFinal = elegirPrincipal(girMatch.nombre, girMatch.fuente, data.nombre_girador)
+
+    // Construir lista enriquecida de candidatos:
+    // 1) GPT detectó (principal) + 2) Otras entidades vistas + 3) Matches BD relacionados
+    const construirCandidatos = (
+      principal: string | null,
+      entidades: string[],
+      matchBD: string | null
+    ): string[] => {
+      const lista: string[] = []
+      const seen = new Set<string>()
+
+      // 1) Principal primero (lo que GPT detectó)
+      if (principal && !estaProhibido(principal)) {
+        const norm = normalizar(principal)
+        if (!seen.has(norm)) {
+          lista.push(principal)
+          seen.add(norm)
+        }
+      }
+
+      // 2) Otras entidades vistas en la orden
+      for (const e of entidades) {
+        if (!e || estaProhibido(e)) continue
+        const norm = normalizar(e)
+        if (seen.has(norm)) continue
+        lista.push(e)
+        seen.add(norm)
+      }
+
+      // 3) Match BD (si hay y es distinto al principal)
+      if (matchBD && !estaProhibido(matchBD)) {
+        const norm = normalizar(matchBD)
+        if (!seen.has(norm)) {
+          lista.push(matchBD)
+          seen.add(norm)
+        }
+      }
+
+      return lista
+    }
+
+    // Filtrar entidades para quitar prohibidos
+    const entidadesFiltradas = entidadesUnif.filter((e: string) => !estaProhibido(e))
+
+    // Lista de candidatos para girador y taller (cada uno con su match BD relevante)
+    const candidatosGirador = construirCandidatos(giradorFinal, entidadesFiltradas, girMatch.nombre)
+    const candidatosTaller = construirCandidatos(tallerFinal, entidadesFiltradas, tallMatch.nombre)
+
+    // Para retrocompatibilidad: lista combinada de entidades (sin duplicados)
+    const entidadesCombinadas: string[] = []
+    const seenEnt = new Set<string>()
+    for (const e of [...candidatosGirador, ...candidatosTaller]) {
+      const n = normalizar(e)
+      if (!seenEnt.has(n)) {
+        entidadesCombinadas.push(e)
+        seenEnt.add(n)
+      }
+    }
 
     const output: any = {
       numero_siniestro: data.numero_siniestro || null,
@@ -739,8 +808,10 @@ export async function POST(request: NextRequest) {
       piezas: piezasSaneadas,
       candidatos: {
         seguros: candidatos.seguros || [],
-        entidades: entidadesUnif,  // Lista única de personas y empresas
-        numeros_documento: candidatos.numeros_documento || [],  // Lista única de números visibles
+        entidades: entidadesCombinadas,  // Lista enriquecida y filtrada (sin Rebiplast/Rafael)
+        candidatos_girador: candidatosGirador,  // Específicos para girador (principal + alternativas + match BD)
+        candidatos_taller: candidatosTaller,    // Específicos para taller (principal + alternativas + match BD)
+        numeros_documento: candidatos.numeros_documento || [],
       },
       confianza: {
         seguro: segMatch.fuente,
