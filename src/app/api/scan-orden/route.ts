@@ -560,6 +560,9 @@ export async function POST(request: NextRequest) {
     }
 
     // ── PASO 2: GPT extrae datos y candidatos ──
+    // Estructura optimizada para prompt caching:
+    // - system: prompt fijo (OpenAI lo cachea automáticamente al 50% en llamadas siguientes en ~5min)
+    // - user: solo la imagen (parte variable, no se cachea)
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
@@ -568,18 +571,38 @@ export async function POST(request: NextRequest) {
         max_tokens: 2000,
         temperature: 0,
         response_format: { type: 'json_object' },
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}`, detail: 'high' } },
-            { type: 'text', text: PROMPT }
-          ]
-        }]
-      })
+        messages: [
+          {
+            role: 'system',
+            content: PROMPT,  // Prompt fijo al inicio - se cachea
+          },
+          {
+            role: 'user',
+            content: [
+              { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}`, detail: 'high' } },
+              { type: 'text', text: 'Procesa esta orden siguiendo las instrucciones del system prompt.' },
+            ],
+          },
+        ],
+      }),
     })
 
     const result = await res.json()
     if (result.error) throw new Error(result.error.message)
+
+    // Log de uso de tokens y cache (para verificar si el prompt caching está funcionando)
+    if (result.usage) {
+      const cached = result.usage.prompt_tokens_details?.cached_tokens || 0
+      const total = result.usage.prompt_tokens || 0
+      const cachePct = total > 0 ? Math.round((cached / total) * 100) : 0
+      debugLog.push({
+        campo: 'tokens',
+        prompt_tokens: total,
+        cached_tokens: cached,
+        cache_hit_pct: cachePct,
+        completion_tokens: result.usage.completion_tokens || 0,
+      })
+    }
 
     const gptRaw = result.choices?.[0]?.message?.content || ''
     const data = parsearGPT(gptRaw)
