@@ -823,6 +823,29 @@ export async function POST(request: NextRequest) {
         normalizada: !!match,
       }
     })
+    // Filtrar piezas inválidas:
+    // 1. Frases que son notas, no piezas
+    // 2. Items sin trabajos Y sin monto (basura)
+    const NOTAS_NO_PIEZA = [
+      /^precio\s+en\s+(dolares|soles)/i,
+      /^tipo\s+de\s+cambio/i,
+      /^proforma/i,
+      /^subtotal/i,
+      /^total/i,
+      /^igv/i,
+    ]
+    const piezasFiltradas = piezasSaneadas.filter((p: any) => {
+      const nombre = (p.nombre_original || p.nombre || '').trim()
+      // Sin nombre → descartar
+      if (!nombre) return false
+      // Es una nota conocida → descartar
+      if (NOTAS_NO_PIEZA.some(re => re.test(nombre))) return false
+      // Sin ningún trabajo Y sin monto → descartar
+      const tieneTrabajo = p.requiere_reparacion || p.requiere_pintura || p.requiere_pulido
+      const tieneMonto = p.monto !== null && p.monto > 0
+      if (!tieneTrabajo && !tieneMonto) return false
+      return true
+    })
 
     // ── PASO 10: Mismatch tipo seguro ──
     let alertaTipoSeguro: string | null = null
@@ -852,7 +875,7 @@ export async function POST(request: NextRequest) {
       monto_total,
       moneda,
       observaciones,
-      piezas: piezasSaneadas,
+      piezas: piezasFiltradas,
       candidatos: {
         seguros: candidatos.seguros || [],
         entidades: entidadesCombinadas,

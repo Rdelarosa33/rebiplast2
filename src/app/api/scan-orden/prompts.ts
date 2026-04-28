@@ -142,6 +142,21 @@ RIMAC tiene 2 formatos. Identifica cuál es:
 ⚠ IMPORTANTE FORMATO 2: el campo "Rodaje" es la PLACA del vehículo,
   no el VIN. NO confundir.
 
+⚠ PIEZAS EN FORMATO 2 - QUÉ NO INCLUIR:
+La tabla tiene 12 items pero solo los items CON DESCRIPCIÓN DE TRABAJO Y MONTO
+son piezas reales. NO incluyas en piezas:
+- "PRECIO EN DOLARES" (es una nota aclaratoria de moneda)
+- "PRECIO EN SOLES" (idem)
+- "TIPO DE CAMBIO" (idem)
+- "PROFORMA" (idem)
+- Items sin descripción ni monto (filas vacías de la tabla 1-12)
+- Items que no describen un trabajo concreto
+
+Solo incluir piezas que:
+- Empiecen con verbo de trabajo (REPARAR, CAMBIAR, REP, PULIR, PINTAR)
+- O tengan un monto en la columna Monto
+- O describan una pieza específica del vehículo
+
 EN AMBOS FORMATOS:
 - Ignorar "REBIPLAST" en campo "Sres:" o "PROVEEDOR" (es el proveedor)
 - "Caso" es distinto a "Siniestro" (no confundir)
