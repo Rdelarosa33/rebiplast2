@@ -124,7 +124,16 @@ RIMAC tiene 2 formatos. Identifica cuál es:
   - numero_siniestro: "Siniestro N°"
   - taller_origen: nombre después de "Sirvase entregar...a los Sres:"
   - nombre_girador: "TÉCNICO SINIESTROS VEHICULOS" (ej: "CESAR BANCES VENTO")
+  - placa: campo "Rodaje:" (NO está como "Placa:" en este formato)
+    Ej: "Rodaje: CFU-921" → placa = "CFU-921"
+  - marca: campo "Marca:" (ej: "ISUZU")
+  - modelo: campo "Modelo:" (ej: "NPR DC")
+  - tipo_vehiculo: campo "Tipo:" (ej: "Camión", "Auto") - va a datos_extra
+  - VIN: NO suele estar en este formato (dejar null)
   - piezas: tabla con items numerados → cada fila con descripción
+
+⚠ IMPORTANTE FORMATO 2: el campo "Rodaje" es la PLACA del vehículo,
+  no el VIN. NO confundir.
 
 EN AMBOS FORMATOS:
 - Ignorar "REBIPLAST" en campo "Sres:" o "PROVEEDOR" (es el proveedor)
