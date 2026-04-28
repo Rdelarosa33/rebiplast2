@@ -129,6 +129,30 @@ RIMAC tiene 2 formatos. Identifica cuál es:
 EN AMBOS FORMATOS:
 - Ignorar "REBIPLAST" en campo "Sres:" o "PROVEEDOR" (es el proveedor)
 - "Caso" es distinto a "Siniestro" (no confundir)
+
+═══════════════════════════════════════════════════════════════
+candidatos.numeros_documento (CRÍTICO - llenar SIEMPRE)
+═══════════════════════════════════════════════════════════════
+
+Listar TODOS los números identificadores que aparezcan en RIMAC. NO omitir.
+
+EN FORMATO 1 (Aprobación) extraer:
+- "NRO DE OC" (ej: "0000130631")
+- "CASO:" (ej: "4135571")
+- "SINIESTRO:" (ej: "991004")
+- "PÓLIZA:" (ej: "1337526")
+
+EN FORMATO 2 (Orden de compra) extraer:
+- "N°" del documento (ej: "60354")
+- "Siniestro N°" (ej: "1007582")
+- "Póliza N°" (ej: "1622758")
+- "Caso:" (ej: "4196945")
+- "Item N°" si lo hay
+
+NO incluir RUC (20381492371 o similares de 11 dígitos).
+
+Ejemplo correcto candidatos.numeros_documento para FORMATO 1 RIMAC:
+["0000130631", "4135571", "991004", "1337526"]
 ${COMUN}`
 
 // =============================================================
