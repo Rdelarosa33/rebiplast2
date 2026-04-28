@@ -138,6 +138,16 @@ PROVEEDOR: siempre es REBIPLAST. NUNCA usar como girador ni taller.
 PASO 1 - IDENTIFICAR ASEGURADORA Y APLICAR REGLAS ESPECÍFICAS
 ═══════════════════════════════════════════════════════════
 
+▸ REGLA GENERAL DEL HEADER:
+Si el HEADER (logo arriba) NO es una aseguradora conocida (RIMAC/MAPFRE/PACIFICO/LA POSITIVA/INTERSEGURO),
+entonces el HEADER ES EL TALLER (taller_origen).
+La aseguradora real estará dentro del documento en campos como "Cia Seguro:", "Facturar a:", etc.
+
+Ejemplos de headers que SON TALLERES (no aseguradoras):
+- "EA Corp SAC" → taller, aseguradora se busca en "Cia Seguro:"
+- "Qualität - Asesoría y Servicios Empresariales" → taller, aseguradora se busca en "Facturar a:"
+- Cualquier RUC/empresa que no sea aseguradora conocida
+
 ▸ RIMAC (logo "RIMAC" arriba a la derecha):
   - tipo_seguro = "RIMAC"
   - nombre_girador = nombre que aparece en "AUTORIZADO:" o "TÉCNICO:" o "TÉCNICO SINIESTROS VEHICULOS" (al final, junto a la firma)
@@ -160,10 +170,11 @@ PASO 1 - IDENTIFICAR ASEGURADORA Y APLICAR REGLAS ESPECÍFICAS
   - numero_orden = "N° OC-..."
   - nombre_asegurado = valor de "Asegurado:"
 
-▸ PACIFICO / EA Corp (header "EA Corp SAC" o "Pacífico"):
+▸ PACIFICO / EA Corp (header con nombre de TALLER + "Cia Seguro: Pacifico" en el documento):
   - tipo_seguro = "PACIFICO"
   - nombre_girador = valor de "Realizado por:" (ej: "Alex Roman")
-  - taller_origen = valor de "Cliente:" (ej: "Alpiconsult S.A.C.")
+  - taller_origen = el NOMBRE DE LA EMPRESA EN EL HEADER arriba a la izquierda (ej: "EA Corp SAC"). NO usar el campo "Cliente:" porque ese es el asegurado.
+  - nombre_asegurado = valor de "Cliente:" (ej: "Alpiconsult S.A.C.")
   - numero_siniestro = valor de "Siniestro:" (puede ser texto como "Colision X Cta del Seguro")
   - numero_orden = valor de "ORDEN DE TRABAJO Nro." (ej: "OTR20262294")
 
