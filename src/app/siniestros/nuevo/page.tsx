@@ -6,9 +6,13 @@ import { crearSiniestro } from '@/lib/actions'
 import { SEGUROS, getTipoTrabajo, getTipoTrabajoDescripcion } from '@/types'
 import { Plus, Trash2, ArrowLeft, ArrowRight, Check, Wrench, Paintbrush, Sparkles, Camera, Upload, Loader2, X, AlertCircle } from 'lucide-react'
 import DebugOCR from './DebugOCR'
+import PiezaAutocomplete from './PiezaAutocomplete'
 
 interface PiezaForm {
   nombre: string
+  nombre_original: string  // Lo que GPT detectó originalmente (para auditoría)
+  nombre_completo: string  // Nombre largo del catálogo si match (ej: "FARO DELANTERO DERECHO")
+  normalizada: boolean     // true si se encontró en catálogo
   lado: string
   color: string
   es_faro: boolean
@@ -21,12 +25,25 @@ interface PiezaForm {
 }
 
 const PIEZA_VACIA: PiezaForm = {
-  nombre: '', lado: 'N/A', color: '', es_faro: false,
+  nombre: '', nombre_original: '', nombre_completo: '', normalizada: false,
+  lado: 'N/A', color: '', es_faro: false,
   requiere_reparacion: true, requiere_pintura: false, requiere_pulido: false,
   tipo_trabajo: 'R', precio: '', observaciones: ''
 }
 
 const LADOS = ['N/A', 'Izquierdo', 'Derecho', 'Frontal', 'Posterior']
+
+// Convertir siglas del OCR (RH/LH/DELT/POST) a etiquetas en español
+function ladoOCRaEtiqueta(lado: string): string {
+  const l = (lado || '').toUpperCase().trim()
+  if (l === 'RH' || l === 'DER') return 'Derecho'
+  if (l === 'LH' || l === 'IZQ') return 'Izquierdo'
+  if (l === 'DELT' || l === 'DEL' || l === 'DELANTERO' || l === 'FRONTAL') return 'Frontal'
+  if (l === 'POST' || l === 'POSTERIOR' || l === 'TRASERO') return 'Posterior'
+  if (l === 'IZQUIERDO') return 'Izquierdo'
+  if (l === 'DERECHO') return 'Derecho'
+  return 'N/A'
+}
 
 
 export default function NuevoSiniestroPage() {
@@ -255,8 +272,11 @@ export default function NuevoSiniestroPage() {
       }))
       if (d.piezas && d.piezas.length > 0) {
         setPiezas(d.piezas.map((p: any) => ({
-          nombre: p.nombre || '',
-          lado: p.lado || 'N/A',
+          nombre: p.nombre || '',                                  // Sigla normalizada o nombre original
+          nombre_original: p.nombre_original || p.nombre || '',    // Lo que GPT detectó
+          nombre_completo: p.nombre_completo || '',                // Nombre largo del catálogo
+          normalizada: !!p.normalizada,                            // Flag: ¿está en catálogo?
+          lado: ladoOCRaEtiqueta(p.lado || 'N/A'),                 // Convertir RH/LH/DELT/POST a español
           color: p.color || '',
           es_faro: p.es_faro || false,
           requiere_reparacion: p.requiere_reparacion !== false,
@@ -695,8 +715,41 @@ export default function NuevoSiniestroPage() {
                 {piezas.length > 1 && <button onClick={() => eliminarPieza(i)} className="text-[#475569] hover:text-red-400"><Trash2 size={14} /></button>}
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2"><label className="label">Nombre *</label>
-                  <input className="input-field" value={pieza.nombre} onChange={e => updatePieza(i, 'nombre', e.target.value)} placeholder="Funda Delantera, Fender..." /></div>
+                <div className="col-span-2">
+                  <label className="label flex items-center gap-2">
+                    Nombre *
+                    {pieza.normalizada && (
+                      <span className="text-[9px] bg-green-500/20 text-green-400 border border-green-500/30 px-1.5 py-0.5 rounded">
+                        EN CATÁLOGO
+                      </span>
+                    )}
+                    {!pieza.normalizada && pieza.nombre_original && (
+                      <span className="text-[9px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded">
+                        SIN MATCH
+                      </span>
+                    )}
+                  </label>
+                  <PiezaAutocomplete
+                    value={pieza.nombre}
+                    onChange={(nuevo, completo) => {
+                      updatePieza(i, 'nombre', nuevo)
+                      if (completo) {
+                        updatePieza(i, 'nombre_completo', completo)
+                        updatePieza(i, 'normalizada', true)
+                      }
+                    }}
+                  />
+                  {pieza.nombre_completo && (
+                    <p className="text-[10px] text-[#475569] mt-1">
+                      {pieza.nombre_completo}
+                    </p>
+                  )}
+                  {pieza.nombre_original && pieza.nombre_original !== pieza.nombre && (
+                    <p className="text-[10px] text-[#475569] mt-1 italic">
+                      Original: {pieza.nombre_original}
+                    </p>
+                  )}
+                </div>
                 <div><label className="label">Lado</label>
                   <select className="input-field" value={pieza.lado} onChange={e => updatePieza(i, 'lado', e.target.value)}>
                     {LADOS.map(l => <option key={l} value={l}>{l}</option>)}

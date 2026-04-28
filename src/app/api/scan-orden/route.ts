@@ -683,6 +683,64 @@ export async function POST(request: NextRequest) {
     const observaciones = partsObs.length > 0 ? partsObs.join(' | ') : null
 
     // ── PASO 9: Sanear piezas ──
+    // ── PASO 9: Sanear piezas + normalizar contra catálogo ──
+    // Cargar catálogo de piezas oficial (ref_piezas)
+    let catalogoPiezas: any[] = []
+    try {
+      const { data: cat, error: catErr } = await supabase
+        .from('ref_piezas')
+        .select('nombre_completo, sigla, alias')
+        .eq('activo', true)
+      if (!catErr && cat) {
+        catalogoPiezas = cat
+      } else {
+        // Fallback sin alias
+        const { data: cat2 } = await supabase
+          .from('ref_piezas')
+          .select('nombre_completo, sigla')
+          .eq('activo', true)
+        catalogoPiezas = cat2 || []
+      }
+    } catch (e) {
+      // Si la tabla no existe aún, no fallar - solo devolver piezas sin normalizar
+      catalogoPiezas = []
+    }
+
+    // Función: buscar match exacto en catálogo para una descripción de pieza
+    // Retorna el registro del catálogo si encuentra match seguro, null si no
+    const matchearPieza = (descripcion: string): { sigla: string; nombre_completo: string } | null => {
+      if (!descripcion || catalogoPiezas.length === 0) return null
+      const descN = normalizar(descripcion)
+      const palabrasDesc = descN.split(' ').filter(p => p.length > 2)
+
+      for (const reg of catalogoPiezas) {
+        const nomN = normalizar(reg.nombre_completo)
+        const sigN = normalizar(reg.sigla)
+        const aliasN: string[] = (reg.alias || []).map((a: string) => normalizar(a))
+
+        // 1. Match exacto en sigla
+        if (descN === sigN) return reg
+        // 2. Match exacto en nombre
+        if (descN === nomN) return reg
+        // 3. Match exacto en alias
+        if (aliasN.some(a => a === descN)) return reg
+
+        // 4. Sigla aparece dentro de la descripción (ej: "REPARAR FUNDA DELT" contiene "FUNDA DELT")
+        if (sigN.length >= 6 && descN.includes(sigN)) return reg
+
+        // 5. Todas las palabras del nombre están en la descripción
+        if (palabrasDesc.length >= 2) {
+          const palabrasNombre = nomN.split(' ').filter(p => p.length > 2)
+          if (palabrasNombre.length >= 2) {
+            const todasMatch = palabrasNombre.every(p => palabrasDesc.includes(p))
+            if (todasMatch) return reg
+          }
+        }
+      }
+
+      return null
+    }
+
     const toBool = (v: any): boolean => {
       if (typeof v === 'boolean') return v
       if (typeof v === 'string') {
@@ -701,8 +759,15 @@ export async function POST(request: NextRequest) {
       else if (requiere_reparacion && requiere_pintura && requiere_pulido) tipo_trabajo = 'RPP'
       else if (requiere_reparacion && requiere_pintura) tipo_trabajo = 'RP'
       else if (requiere_reparacion) tipo_trabajo = 'R'
+
+      const nombreOriginal = p.nombre || ''
+      // Intentar match con catálogo
+      const match = matchearPieza(nombreOriginal)
+
       return {
-        nombre: p.nombre || '',
+        nombre: match ? match.sigla : nombreOriginal,           // Sigla normalizada o nombre original
+        nombre_original: nombreOriginal,                          // Lo que GPT vio en la orden
+        nombre_completo: match ? match.nombre_completo : null,    // Nombre largo del catálogo (si match)
         lado: p.lado || 'N/A',
         requiere_reparacion,
         requiere_pintura,
@@ -712,6 +777,7 @@ export async function POST(request: NextRequest) {
         precio: p.precio || null,
         monto: p.monto != null ? Number(p.monto) : null,
         observaciones: p.observaciones || null,
+        normalizada: !!match,                                     // Flag para UI: "se encontró en catálogo"
       }
     })
 
