@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Profile, ROLE_LABELS, ROLE_COLOR } from '@/types'
 import {
   LayoutDashboard, ClipboardList, QrCode, Users, UserCog, CreditCard,
-  LogOut, Wrench, ShieldCheck, Hammer, Package,
+  LogOut, Wrench, ShieldCheck, Hammer, Package, RefreshCw,
   ChevronLeft, ChevronRight, X, Menu
 } from 'lucide-react'
 
@@ -60,7 +60,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       ? [{ href: '/siniestros/nuevo', icon: Package, label: 'Recojo' }]
       : []),
     ...(profile?.role === 'admin' || profile?.role === 'supervisor'
-      ? [{ href: '/supervisor', icon: ShieldCheck, label: 'Supervisor' }]
+      ? [
+          { href: '/supervisor', icon: ShieldCheck, label: 'Supervisor' },
+          { href: '/supervisor/reasignar', icon: RefreshCw, label: 'Reasignar' },
+        ]
       : []),
     ...(profile?.role === 'admin'
       ? [{ href: '/admin/usuarios', icon: UserCog, label: 'Usuarios' }, { href: '/admin/suscripcion', icon: CreditCard, label: 'Suscripción' }]
