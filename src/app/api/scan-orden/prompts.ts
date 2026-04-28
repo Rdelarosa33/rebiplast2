@@ -365,18 +365,41 @@ EL USUARIO YA CONFIRMÓ QUE ES PACÍFICO, ASUME tipo_seguro = "PACIFICO".
 Si la imagen NO es de Pacífico, pon tipo_seguro_detectado con el real.
 
 ═══════════════════════════════════════════════════════════════
+⛔ REGLAS ABSOLUTAS - NUNCA HAGAS ESTO ⛔
+═══════════════════════════════════════════════════════════════
+
+NUNCA, BAJO NINGUNA CIRCUNSTANCIA, PONGAS:
+
+❌ "REBIPLAST" / "REBIPLAST EIRL" / "REBIPLAST E.I.R.L." en ningún campo
+   ni en candidatos.entidades.
+   → Rebiplast es SIEMPRE el PROVEEDOR. Aparece en "PROVEEDOR:" pero
+     ES INTERNO, no se incluye en candidatos ni en girador ni taller.
+   → Si aparece "PROVEEDOR: REBIPLAST", IGNÓRALO completamente.
+
+❌ El nombre del ASEGURADO/AFECTADO como girador
+   (ej: "MINERVA ALBANIA SANCHEZ CARRILLO" es asegurado, NO girador)
+
+❌ "RAFAEL GONZALES" en ningún campo
+
+═══════════════════════════════════════════════════════════════
 PACÍFICO tiene 2 formatos comunes:
 ═══════════════════════════════════════════════════════════════
 
-▸ FORMATO PACÍFICO ASISTE (header con "@pacificoasiste.com.pe"):
+▸ FORMATO PACÍFICO ASISTE (campos Folio/Taller/Siniestro/Caso):
   - numero_orden: campo "Folio:" (ej: "20260427-1227552_01")
-  - numero_siniestro: campo "Siniestro:"
-  - taller_origen: campo "Taller/Agencia:" (si es código numérico,
-    buscar nombre en otro lado; si no, dejar null)
+  - numero_siniestro: campo "Siniestro:" (ej: "1001464560")
+  - caso: campo "Caso:" (ej: "548012") → va a datos_extra.expediente
+  - taller_origen: campo "Taller/Agencia:" tal cual aparece
+    Ej: "Taller/Agencia: PEB00068 Terminal" → taller = "PEB00068 Terminal"
+    (incluye el código + nombre, NO separar)
   - nombre_girador: campo "Nombre Usuario:" (ej: "Alberto Rotalde")
-  - nombre_asegurado: campo "Afectado:"
-  - placa: campo "Placa:"
-  - marca: campo "Fabricante:"
+  - nombre_asegurado: campo "Afectado:" (ej: "MINERVA ALBANIA SANCHEZ CARRILLO")
+  - placa: campo "Placa:" (ej: "BES679")
+  - marca: campo "Fabricante:" (ej: "NISSAN")
+  - modelo: campo "Modelo:" (ej: "V-DRIVE")
+  - año: campo "Año Vehículo:"
+  - vin: campo "VIN:"
+  - poliza: campo "Póliza:"
 
 ▸ FORMATO EA Corp / Pacífico tradicional (header con nombre de TALLER):
   - El HEADER es el nombre del taller (ej: "EA Corp SAC")
@@ -385,9 +408,74 @@ PACÍFICO tiene 2 formatos comunes:
   - nombre_asegurado: campo "Cliente:" (ej: "Alpiconsult S.A.C.")
   - tipo_seguro: del campo "Cia Seguro:" (será "PACIFICO")
 
-EN AMBOS:
-- piezas: tabla "DESCRIPCIÓN" o "OPERACION DESCRIPCION"
-- monto: "TOTAL" o "Precio Total S/"
+═══════════════════════════════════════════════════════════════
+MONTOS EN PACÍFICO ASISTE (CRÍTICO - NO CONFUNDIR)
+═══════════════════════════════════════════════════════════════
+
+Pacífico Asiste muestra TODOS los montos en USD y PEN simultáneamente:
+
+    Subtotal    US$ 30.00
+                104.73 S/.
+    IGV         US$ 5.40
+                18.85 S/.
+    Total       US$ 35.40
+                123.58 S/.
+
+REGLA OBLIGATORIA:
+- monto_total = el valor en USD del Total (ej: 35.40)
+- moneda = "USD" SIEMPRE en este formato
+- NO uses 123.58 como monto_total con moneda USD (eso mezcla los 2)
+- El valor S/. va informativo en datos_extra.observaciones_orden si quieres
+
+EJEMPLO CORRECTO:
+  monto_total: 35.40
+  moneda: "USD"
+
+EJEMPLO INCORRECTO (NO HAGAS):
+  monto_total: 123.58, moneda: "USD"  ← mezcla USD con valor en soles
+
+En la tabla DESCRIPCIÓN, cada pieza tiene formato:
+"US$ 30.00 -> 104.73 S/."
+→ monto de la pieza = 30 (USD), no 104.73
+
+═══════════════════════════════════════════════════════════════
+candidatos.numeros_documento (CRÍTICO - llenar SIEMPRE)
+═══════════════════════════════════════════════════════════════
+
+Listar TODOS los identificadores numéricos visibles, incluyendo:
+- Folio (ej: "20260427-1227552_01")
+- Siniestro (ej: "1001464560")
+- Caso (ej: "548012")
+- Póliza (ej: "2003015912")
+- Referencia de pieza (ej: "260427120009419")
+
+NO incluir RUC ni teléfonos.
+
+Ejemplo correcto:
+["20260427-1227552_01", "1001464560", "548012", "2003015912"]
+
+═══════════════════════════════════════════════════════════════
+PIEZAS EN PACÍFICO
+═══════════════════════════════════════════════════════════════
+
+Las piezas están en la tabla con columnas:
+DESCRIPCIÓN | REFERENCIA | IMPORTE | % DTO P/R | TOTAL
+
+Cada fila numerada (1, 2, 3...) que tenga descripción es UNA pieza.
+
+Abreviaturas comunes en Pacífico:
+- "RE" = REPARAR (ej: "RE PARACHQ DLT")
+- "CA" o "CAM" = CAMBIAR
+- "PARACHQ" = PARACHOQUE
+- "DLT" = DELANTERO
+- "TRS" = POSTERIOR/TRASERO
+- "DCHO" / "DER" = DERECHO
+- "IZQ" / "IZQO" = IZQUIERDO
+- "CAP" = CAPÓ
+- "GUARD" = GUARDAFANGO
+
+Mantén las abreviaturas tal cual en el campo nombre. El backend tiene
+un catálogo de equivalencias para normalizarlas.
 ${COMUN}`
 
 // =============================================================
