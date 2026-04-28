@@ -244,6 +244,29 @@ REGLAS PARA FLAGS:
 - "REP+PINTURA", "RP", "Reparación + Pintura" → ambas (reparación + pintura)
 
 ═══════════════════════════════════════════════════════════════
+DESCRIPCIONES EN VARIAS LÍNEAS (importante)
+═══════════════════════════════════════════════════════════════
+
+Si la descripción de UNA pieza está dividida en MÚLTIPLES LÍNEAS dentro
+de la misma celda de tabla (con saltos de línea), UNÍFICALAS en una sola
+pieza con nombre completo. NO las trates como piezas separadas.
+
+Ejemplos de descripciones multilínea que son UNA SOLA pieza:
+- "REPARAR\nPARACHOQUE\nPOSTERIOR"  → 1 pieza: "REPARAR PARACHOQUE POSTERIOR"
+- "REPARACION DE\nFUNDA POSTERIOR"  → 1 pieza: "REPARACION DE FUNDA POSTERIOR"
+- "REPARACION Y\nPINTURA DE SPOILER\nDE FUNDA POSTERIOR" → 1 pieza
+- "REP MOLDURA\nMALETERA"  → 1 pieza: "REP MOLDURA MALETERA"
+
+Cómo distinguir si son piezas separadas o una sola:
+- MISMA CELDA con saltos de línea = 1 pieza, unir
+- DIFERENTES CELDAS / FILAS de tabla = piezas distintas
+- MISMA CELDA con códigos de pieza distintos al inicio (ej: "REP A...\nREP B...") = piezas distintas
+
+Si el texto está desvaído, parcialmente tachado o difícil de leer, intenta
+leer todas las palabras visibles aunque algunas estén borrosas. Es mejor
+incluir el nombre completo aunque tenga que adivinar 1-2 letras.
+
+═══════════════════════════════════════════════════════════════
 MONTOS (importante: extraer SIEMPRE)
 ═══════════════════════════════════════════════════════════════
 
@@ -397,8 +420,11 @@ async function optimizarImagen(bytes: ArrayBuffer): Promise<{ base64: string; mi
     const optimized = await sharp(Buffer.from(bytes))
       .rotate()                                       // Auto-rotar según EXIF (corrige fotos verticales)
       .grayscale()                                    // A escala de grises (texto B/N en órdenes)
+      .normalize()                                    // Estira rango tonal (oscurece negros, aclara blancos)
+      .linear(1.4, -40)                               // Aumenta contraste (multiplicador, offset)
+      .sharpen(1.0)                                   // Realza bordes para texto desvaído
       .resize({ width: 800, withoutEnlargement: true }) // Resize a 800px (~60% menos tokens vs 1200)
-      .jpeg({ quality: 70, mozjpeg: true })           // mozjpeg comprime ~10% más con misma calidad
+      .jpeg({ quality: 75, mozjpeg: true })           // Subido a 75 para conservar más detalle del contraste
       .toBuffer()
     return { base64: optimized.toString('base64'), mimeType: 'image/jpeg' }
   } catch {
