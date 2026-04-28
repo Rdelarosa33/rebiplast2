@@ -105,26 +105,36 @@ function matchConLista(candidatos: string[], registros: any[], campoNombre: stri
 // ============================================================
 const PROMPT = `Lee esta orden de trabajo automotriz peruana. Devuelve SOLO JSON válido.
 
-CAMPOS: numero_siniestro(campo Siniestro/Caso/SINIESTRO - solo el numero, NO descripcion), numero_orden(campo NRO DE OC/OTR.../OC-/Folio/ORDEN DE TRABAJO Nro. - NO usar NumOS para orden), marca, placa(ABC123 o ABC1234), color
+PASO 1 - IDENTIFICAR EMISOR:
+El emisor es la empresa/institución que aparece en el encabezado principal (logo o nombre destacado).
+Aseguradoras conocidas: RIMAC, MAPFRE, PACIFICO, EA Corp, LA POSITIVA, HDI
+- Si el emisor ES aseguradora → tipo_seguro=emisor, buscar taller DENTRO de la orden
+- Si el emisor NO es aseguradora (ej: Qualitat, cualquier taller) → taller_origen=emisor, buscar seguro DENTRO de la orden
+
+PASO 2 - EXTRAER CAMPOS:
+numero_siniestro: campo Siniestro/Caso - solo el numero, NO descripcion
+numero_orden: campo NRO DE OC/OTR.../OC-/Folio/ORDEN DE TRABAJO Nro. - NO usar NumOS
+marca, placa(ABC123 o ABC1234), color
+nombre_girador: nombre de PERSONA (no direccion ni empresa) junto a Tecnico/Perito/Asesor/Realizado por/VoBo/Jefe de Siniestros/firma. Ignorar direcciones y RUC.
+taller_origen: si emisor es aseguradora → buscar en TALLER PRINCIPAL/ATENCION A TALLER/Cliente. NUNCA usar REBIPLAST.
 tipo_seguro: RIMAC/MAPFRE/PACIFICO/LA_POSITIVA/HDI/INTERSEGURO/TALLER/OTRO
-nombre_girador: nombre de PERSONA (no direccion, no empresa) junto a: Tecnico/Perito/Asesor/Realizado por/VoBo/Jefe de Siniestros/Asesor Tecnico/firma con nombre. Ignorar direcciones, RUC, telefonos.
-taller_origen: extraer el VALOR (no el label) de: TALLER PRINCIPAL > ATENCION A TALLER > encabezado empresa (ej: EA Corp SAC) > "a los señores" > firma empresa. NUNCA usar: REBIPLAST.
 datos_extra: expediente, poliza, modelo, anio, vin, nombre_asegurado, telefono_asegurado, observaciones_orden
 
 CANDIDATOS (todo lo que veas aunque no estés seguro):
 candidatos.seguros, candidatos.giradores, candidatos.talleres(excepto REBIPLAST)
 
-PIEZAS - cada linea = UNA pieza, NO agrupar. Revisar siempre Observaciones para piezas adicionales.
+PASO 3 - PIEZAS:
+Cada linea = UNA pieza, NO agrupar. Revisar siempre Observaciones para piezas adicionales.
 MAPFRE: cada "REP xxx" = pieza separada
 RIMAC: cada fila descripcion/SERVICIO = pieza
 LA_POSITIVA: cada fila tabla Reparacion/Descripcion = pieza
 PACIFICO/EA Corp: cada fila OPERACION/DESCRIPCION = pieza
-INTERSEGURO/QUALITAT: piezas SOLO en Observaciones (ej: "OT POR REPUESTO: FUNDA POST SUP" → pieza="FUNDA POST SUP"). Ignorar tabla de montos.
+Qualitat/INTERSEGURO: piezas SOLO en Observaciones (ej: "OT POR REPUESTO: FUNDA POST SUP" → pieza="FUNDA POST SUP"). Ignorar tabla de montos (Planchado/Pintura/Mecanica son categorias NO piezas).
 
 Campos pieza: nombre, lado(LH=Izquierdo/RH=Derecho/DELT=Frontal/POST=Posterior/N/A), requiere_reparacion(REP), requiere_pintura(PINTURA/RP), es_faro(FARO/NEBLINERO), requiere_pulido(PULIDO/faro sin cambio), tipo_trabajo(R/P/RP/PU)
-Ignorar: SUBTOTAL, IGV, TOTAL, Planchado/Pintura/Mecanica como categorias de monto.
+Ignorar: SUBTOTAL, IGV, TOTAL, filas vacias.
 
-{"numero_siniestro":null,"numero_orden":null,"marca":null,"placa":null,"color":null,"tipo_seguro":null,"nombre_girador":null,"taller_origen":null,"texto_completo":null,"datos_extra":{"expediente":null,"poliza":null,"modelo":null,"anio":null,"vin":null,"nombre_asegurado":null,"telefono_asegurado":null,"observaciones_orden":null},"candidatos":{"seguros":[],"giradores":[],"talleres":[]},"piezas":[{"nombre":"","lado":"N/A","requiere_reparacion":false,"requiere_pintura":false,"es_faro":false,"requiere_pulido":false,"tipo_trabajo":null}]}`
+{"numero_siniestro":null,"numero_orden":null,"marca":null,"placa":null,"color":null,"tipo_seguro":null,"nombre_girador":null,"taller_origen":null,"datos_extra":{"expediente":null,"poliza":null,"modelo":null,"anio":null,"vin":null,"nombre_asegurado":null,"telefono_asegurado":null,"observaciones_orden":null},"candidatos":{"seguros":[],"giradores":[],"talleres":[]},"piezas":[{"nombre":"","lado":"N/A","requiere_reparacion":false,"requiere_pintura":false,"es_faro":false,"requiere_pulido":false,"tipo_trabajo":null}]}`
 
 function limpiarJSON(text: string): string {
   return text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
