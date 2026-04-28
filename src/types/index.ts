@@ -305,12 +305,15 @@ export interface FlagsPieza {
 }
 
 export function getTipoTrabajo(flags: FlagsPieza): string {
-  const { requiere_reparacion, requiere_pintura, requiere_pulido } = flags
+  const { requiere_reparacion, requiere_pintura, requiere_pulido, es_faro } = flags
 
-  // Solo pulido (faro opaco sin daño)
-  if (!requiere_reparacion && !requiere_pintura && requiere_pulido) return 'PU'
+  // REGLA ESPECIAL: si es FARO y tiene cualquier trabajo → siempre RPP
+  // (en el taller, hacer un faro implica los 3 trabajos: reparar + pintar + pulir)
+  if (es_faro && (requiere_reparacion || requiere_pulido || requiere_pintura)) {
+    return 'RPP'
+  }
 
-  // Reparación + pintura + pulido
+  // Reparación + pintura + pulido (caso raro en piezas no-faro)
   if (requiere_reparacion && requiere_pintura && requiere_pulido) return 'RPP'
 
   // Reparación + pintura
@@ -318,6 +321,12 @@ export function getTipoTrabajo(flags: FlagsPieza): string {
 
   // Solo reparación (default)
   if (requiere_reparacion) return 'R'
+
+  // Solo pintura → asumir RP (no se ofrece "P" solo)
+  if (requiere_pintura) return 'RP'
+
+  // Solo pulido sin reparación: si no es faro, fallback a R
+  if (requiere_pulido) return 'R'
 
   // Caso raro: nada marcado → fallback a R
   return 'R'
@@ -327,11 +336,13 @@ export function getTipoTrabajoDescripcion(codigo: string): string {
   switch (codigo) {
     case 'R': return 'Solo reparación'
     case 'RP': return 'Reparación + Pintura'
-    case 'RPP': return 'Reparación + Pintura + Pulido'
-    case 'PU': return 'Solo pulido'
+    case 'RPP': return 'Reparación + Pintura + Pulido (faro)'
     default: return codigo
   }
 }
+
+// Tipos válidos (eliminados PU y RPU)
+export const TIPOS_TRABAJO_VALIDOS = ['R', 'RP', 'RPP'] as const
 
 export function validarFlagsPieza(flags: FlagsPieza): string | null {
   const { requiere_reparacion, requiere_pintura, requiere_pulido, es_faro } = flags

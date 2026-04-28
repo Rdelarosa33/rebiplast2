@@ -750,24 +750,49 @@ export async function POST(request: NextRequest) {
       return !!v
     }
     const piezasSaneadas = (data.piezas || []).map((p: any) => {
-      const requiere_reparacion = toBool(p.requiere_reparacion)
-      const requiere_pintura = toBool(p.requiere_pintura)
-      const es_faro = toBool(p.es_faro)
-      const requiere_pulido = toBool(p.requiere_pulido)
+      // Lógica ACUMULATIVA: detectar palabras clave en la descripción
+      // (defensa contra GPT que a veces se confunde con "REPARACIONES PULIDO")
+      const desc = (p.nombre || '').toUpperCase()
+      const palabraRep = /\b(REP|REPARAR|REPARACI|REPARACIONES)/.test(desc)
+      const palabraPint = /\b(PINTURA|PINT)\b/.test(desc)
+      const palabraPul = /\b(PULIDO|PULIR)\b/.test(desc)
+      const palabraFaro = /\b(FARO|NEBLINERO)\b/.test(desc)
+
+      // Combinar lo que dijo GPT con lo que detectamos en la descripción
+      let requiere_reparacion = toBool(p.requiere_reparacion) || palabraRep
+      let requiere_pintura = toBool(p.requiere_pintura) || palabraPint
+      let requiere_pulido = toBool(p.requiere_pulido) || palabraPul
+      let es_faro = toBool(p.es_faro) || palabraFaro
+
+      // REGLA ESPECIAL: si es FARO y tiene CUALQUIER trabajo, los 3 flags se activan
+      // (en el taller, hacer un faro = reparar + pintar + pulir, siempre)
+      if (es_faro && (requiere_reparacion || requiere_pulido || requiere_pintura)) {
+        requiere_reparacion = true
+        requiere_pintura = true
+        requiere_pulido = true
+      }
+
+      // Calcular tipo_trabajo (eliminado PU - faros siempre RPP)
       let tipo_trabajo = 'R'
-      if (!requiere_reparacion && !requiere_pintura && requiere_pulido) tipo_trabajo = 'PU'
-      else if (requiere_reparacion && requiere_pintura && requiere_pulido) tipo_trabajo = 'RPP'
-      else if (requiere_reparacion && requiere_pintura) tipo_trabajo = 'RP'
-      else if (requiere_reparacion) tipo_trabajo = 'R'
+      if (es_faro && (requiere_reparacion || requiere_pulido)) {
+        tipo_trabajo = 'RPP'
+      } else if (requiere_reparacion && requiere_pintura && requiere_pulido) {
+        tipo_trabajo = 'RPP'
+      } else if (requiere_reparacion && requiere_pintura) {
+        tipo_trabajo = 'RP'
+      } else if (requiere_pintura) {
+        tipo_trabajo = 'RP'  // pintura sola → asumir RP
+      } else {
+        tipo_trabajo = 'R'
+      }
 
       const nombreOriginal = p.nombre || ''
-      // Intentar match con catálogo
       const match = matchearPieza(nombreOriginal)
 
       return {
-        nombre: match ? match.sigla : nombreOriginal,           // Sigla normalizada o nombre original
-        nombre_original: nombreOriginal,                          // Lo que GPT vio en la orden
-        nombre_completo: match ? match.nombre_completo : null,    // Nombre largo del catálogo (si match)
+        nombre: match ? match.sigla : nombreOriginal,
+        nombre_original: nombreOriginal,
+        nombre_completo: match ? match.nombre_completo : null,
         lado: p.lado || 'N/A',
         requiere_reparacion,
         requiere_pintura,
@@ -777,7 +802,7 @@ export async function POST(request: NextRequest) {
         precio: p.precio || null,
         monto: p.monto != null ? Number(p.monto) : null,
         observaciones: p.observaciones || null,
-        normalizada: !!match,                                     // Flag para UI: "se encontró en catálogo"
+        normalizada: !!match,
       }
     })
 

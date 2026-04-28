@@ -39,11 +39,16 @@ LADOS:
 - POST/Posterior/Trasero → "POST"
 - Sin lado → "N/A"
 
-TIPO_TRABAJO:
+TIPO_TRABAJO (calcular tras los flags):
 - Solo Reparación → "R"
 - Reparación + Pintura → "RP"
-- Reparación + Pintura + Pulido (faro) → "RPP"
-- Solo Pulido (faro sin cambio) → "PU"
+- Reparación + Pintura + Pulido → "RPP"
+- REGLA ESPECIAL FARO: si es_faro=true y tiene CUALQUIER trabajo
+  (reparación, pintura o pulido) → tipo_trabajo = "RPP" SIEMPRE
+  Razón: en el taller, trabajar un faro implica los 3 procesos.
+
+Tipos eliminados: NO uses "PU" ni "P" solo. Si solo hay pulido en un faro → RPP.
+Si solo hay pintura sin reparación → asumir "RP".
 
 MONTOS (extraer SIEMPRE si hay):
 - monto_total: total del documento (TOTAL > SUBTOTAL > suma de piezas)
@@ -213,7 +218,7 @@ Las piezas están en la tabla "DESCRIPCIÓN Y EVALUACIÓN DE DAÑOS".
 Cada fila es UNA pieza. La columna "D" suele tener "REP" (que es el
 CÓDIGO DE OPERACIÓN, no significa siempre reparación).
 
-LO QUE DEFINE EL TRABAJO ES LA DESCRIPCIÓN, NO EL CÓDIGO "REP":
+LO QUE DEFINE EL TRABAJO ES LA DESCRIPCIÓN. Lee TODAS las palabras:
 
 ▸ "REPARACIONES FUNDA DELT"
   → reparación de funda delantera
@@ -223,19 +228,29 @@ LO QUE DEFINE EL TRABAJO ES LA DESCRIPCIÓN, NO EL CÓDIGO "REP":
   → requiere_reparacion=true, lado="POST", tipo_trabajo="R"
 
 ▸ "REPARACIONES PULIDO DE FARO DELT RH"
-  → ¡OJO! "REPARACIONES" es solo el nombre de la columna.
-  → El trabajo real es PULIDO de FARO.
-  → es_faro=true, requiere_pulido=true, requiere_reparacion=FALSE
+  → REPARACIÓN + PULIDO de un FARO (las 2 acciones se aplican).
+  → es_faro=true, requiere_reparacion=true, requiere_pulido=true
+  → REGLA FARO: como es faro y tiene trabajos, tipo_trabajo = "RPP" SIEMPRE
   → lado="RH" (lado lateral más importante que delantero)
-  → tipo_trabajo="PU" (pulido de faro)
 
 ▸ "REPARACIONES PINTURA DE PARACHOQUE"
-  → solo pintura
-  → requiere_pintura=true, requiere_reparacion=false, tipo_trabajo="P"
+  → reparación + pintura
+  → requiere_reparacion=true, requiere_pintura=true, tipo_trabajo="RP"
+
+▸ "PULIDO DE FARO DELT" (sin la palabra REPARACIONES)
+  → pulido de faro
+  → es_faro=true, requiere_pulido=true
+  → REGLA FARO: tipo_trabajo = "RPP" SIEMPRE (faros = los 3 trabajos)
 
 ▸ "REPARACIONES REP MOLDURA MALETERA"
   → reparación
   → requiere_reparacion=true, tipo_trabajo="R"
+
+REGLA ABSOLUTA DE FAROS:
+Cualquier trabajo en una pieza que sea FARO (es_faro=true) genera
+automáticamente tipo_trabajo="RPP", sin importar qué palabras aparezcan.
+Esto es porque trabajar un faro siempre implica reparar + pintar + pulir
+en el taller. NO uses "PU" ni "R" para faros.
 
 PALABRAS CLAVE en la descripción (NO en la columna):
 - Si dice "PULIDO" → requiere_pulido=true (NO reparación)
