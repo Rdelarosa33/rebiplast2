@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentUser } from '@/lib/actions'
 import { redirect } from 'next/navigation'
-import { CreditCard, Calendar, TrendingDown, RefreshCw } from 'lucide-react'
+import { CreditCard, Calendar, TrendingDown, RefreshCw, Bug } from 'lucide-react'
+import Link from 'next/link'
 
 export const revalidate = 0
 
@@ -69,7 +70,13 @@ export default async function SuscripcionPage() {
         <div className="flex items-center gap-2 mb-4">
           <CreditCard size={18} className="text-[#00D4FF]" />
           <h2 className="font-syne font-semibold text-white">Créditos OCR</h2>
-          <span className="text-xs text-[#475569] ml-auto">$0.50 por escaneo</span>
+          <Link
+            href="/admin/diagnostico-ocr"
+            className="ml-auto text-xs bg-[#131920] border border-[#1E2D42] text-[#94A3B8] hover:text-amber-400 hover:border-amber-400/30 rounded-lg px-3 py-1.5 flex items-center gap-1.5"
+          >
+            <Bug size={12} />
+            Diagnóstico
+          </Link>
         </div>
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-[#131920] rounded-xl p-3 text-center">
@@ -85,6 +92,7 @@ export default async function SuscripcionPage() {
             <p className="text-xs text-[#475569]">Gastado este mes</p>
           </div>
         </div>
+        <p className="text-[10px] text-[#475569] text-center mt-2">$0.50 por escaneo</p>
         {(cred?.saldo || 0) < 10 && (
           <div className="mt-3 bg-orange-500/10 border border-orange-500/30 rounded-xl p-3">
             <p className="text-sm text-orange-400">⚠ Saldo bajo — quedan {Math.floor((cred?.saldo || 0) / 0.5)} escaneos disponibles</p>

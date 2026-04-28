@@ -287,7 +287,8 @@ export async function POST(request: NextRequest) {
     const result = await res.json()
     if (result.error) throw new Error(result.error.message)
 
-    const data = parsearGPT(result.choices?.[0]?.message?.content || '')
+    const gptRaw = result.choices?.[0]?.message?.content || ''
+    const data = parsearGPT(gptRaw)
     const candidatos = data.candidatos || { seguros: [], giradores: [], talleres: [] }
 
     // ── PASO 3: Extraer monto con regex ──
@@ -380,6 +381,8 @@ export async function POST(request: NextRequest) {
         numero_siniestro: output.numero_siniestro,
         costo: COSTO,
         exitoso: true,
+        gpt_raw: gptRaw,
+        debug_log: debugLog,
       })
     } catch (e) {
       console.error('Error registrando uso OCR:', e)
@@ -389,7 +392,8 @@ export async function POST(request: NextRequest) {
       success: true,
       data: output,
       proveedor: 'gpt-4o-mini+refs',
-      debug: debugLog
+      debug: debugLog,
+      gpt_raw: gptRaw,
     })
 
   } catch (error: any) {

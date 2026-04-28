@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { crearSiniestro } from '@/lib/actions'
 import { SEGUROS, getTipoTrabajo, getTipoTrabajoDescripcion } from '@/types'
 import { Plus, Trash2, ArrowLeft, ArrowRight, Check, Wrench, Paintbrush, Sparkles, Camera, Upload, Loader2, X, AlertCircle } from 'lucide-react'
+import DebugOCR from './DebugOCR'
 
 interface PiezaForm {
   nombre: string
@@ -36,6 +37,7 @@ export default function NuevoSiniestroPage() {
   const [error, setError] = useState('')
   const [imagenPreview, setImagenPreview] = useState<string | null>(null)
   const [formKey, setFormKey] = useState(0)
+  const [scanResult, setScanResult] = useState<{ data?: any; debug?: any[]; gpt_raw?: string } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
 
@@ -92,6 +94,8 @@ export default function NuevoSiniestroPage() {
       fd.append('imagen', archivoProcesado)
       const res = await fetch('/api/scan-orden', { method: 'POST', body: fd })
       const result = await res.json()
+      // Siempre guardamos el resultado para debug, exitoso o fallido
+      setScanResult(result)
       if (!res.ok || result.error) {
         setError('No se pudo leer la orden. Ingresa los datos manualmente.')
         setScanLoading(false)
@@ -184,6 +188,7 @@ export default function NuevoSiniestroPage() {
 
   const limpiarFormulario = () => {
     setImagenPreview(null)
+    setScanResult(null)
     setFormKey(k => k + 1)
     setForm({
       numero_siniestro: '', numero_orden: '', expediente: '', poliza: '',
@@ -240,15 +245,22 @@ export default function NuevoSiniestroPage() {
                 </div>
               </div>
             ) : imagenPreview ? (
-              <div className="relative">
+              <div className="relative space-y-2">
                 <img src={imagenPreview} alt="Orden" className="w-full max-h-48 object-cover rounded-xl" />
                 <button onClick={limpiarFormulario}
                   className="absolute top-2 right-2 w-7 h-7 bg-black/60 rounded-full flex items-center justify-center text-white">
                   <X size={14} />
                 </button>
-                <div className="mt-2 bg-green-500/10 border border-green-500/30 rounded-xl p-2 text-xs text-green-400 text-center">
+                <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-2 text-xs text-green-400 text-center">
                   ✓ Datos cargados — revisa y corrige si es necesario
                 </div>
+                {scanResult && (
+                  <DebugOCR
+                    debug={scanResult.debug}
+                    gptRaw={scanResult.gpt_raw}
+                    data={scanResult.data}
+                  />
+                )}
               </div>
             ) : (
               <div className="flex gap-3">
