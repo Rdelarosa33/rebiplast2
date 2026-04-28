@@ -658,7 +658,16 @@ export async function POST(request: NextRequest) {
 
     const candidatosGirador = armarLista(giradorFinal, entidadesParaGirador)
     const candidatosTaller = armarLista(tallerFinal, entidadesParaTaller)
-    const entidadesCombinadas = [...new Set([...candidatosGirador, ...candidatosTaller])]
+    // Combinar girador + taller sin duplicados (compatible ES5)
+    const entidadesCombinadas: string[] = []
+    const seenComb = new Set<string>()
+    for (const e of candidatosGirador.concat(candidatosTaller)) {
+      const n = normalizar(e)
+      if (!seenComb.has(n)) {
+        entidadesCombinadas.push(e)
+        seenComb.add(n)
+      }
+    }
 
     // ── PASO 8: Observaciones ──
     const extra = data.datos_extra || {}
