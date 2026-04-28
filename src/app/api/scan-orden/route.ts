@@ -107,7 +107,7 @@ const PROMPT = `Lee esta orden de trabajo automotriz peruana. Devuelve SOLO JSON
 
 CAMPOS: numero_siniestro(campo Siniestro/Caso/SINIESTRO - solo el numero, NO descripcion), numero_orden(campo NRO DE OC/OTR.../OC-/Folio/ORDEN DE TRABAJO Nro. - NO usar NumOS para orden), marca, placa(ABC123 o ABC1234), color
 tipo_seguro: RIMAC/MAPFRE/PACIFICO/LA_POSITIVA/HDI/INTERSEGURO/TALLER/OTRO
-nombre_girador: nombre junto a Tecnico/Perito/Asesor/Realizado por/VoBo/firma
+nombre_girador: nombre de PERSONA (no direccion, no empresa) junto a: Tecnico/Perito/Asesor/Realizado por/VoBo/Jefe de Siniestros/Asesor Tecnico/firma con nombre. Ignorar direcciones, RUC, telefonos.
 taller_origen: extraer el VALOR (no el label) de: TALLER PRINCIPAL > ATENCION A TALLER > encabezado empresa (ej: EA Corp SAC) > "a los señores" > firma empresa. NUNCA usar: REBIPLAST.
 datos_extra: expediente, poliza, modelo, anio, vin, nombre_asegurado, telefono_asegurado, observaciones_orden
 
