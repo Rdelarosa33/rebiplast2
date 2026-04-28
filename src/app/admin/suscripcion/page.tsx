@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/actions'
 import { redirect } from 'next/navigation'
 import { CreditCard, Calendar, TrendingDown, RefreshCw, Bug } from 'lucide-react'
 import Link from 'next/link'
+import DesgloseSuscripcion from './DesgloseSuscripcion'
 
 export const revalidate = 0
 
@@ -58,10 +59,10 @@ export default async function SuscripcionPage() {
             {sus?.activa && diasRestantes > 0 ? 'Activo' : 'Vencido'}
           </span>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 mb-3">
           <div className="bg-[#131920] rounded-xl p-3">
             <p className="text-xs text-[#475569]">Precio mensual</p>
-            <p className="text-xl font-syne font-bold text-white">${sus?.precio_mensual || 250}</p>
+            <p className="text-xl font-syne font-bold text-white">${sus?.precio_mensual || 300}</p>
           </div>
           <div className="bg-[#131920] rounded-xl p-3">
             <p className="text-xs text-[#475569]">Vence el</p>
@@ -72,6 +73,7 @@ export default async function SuscripcionPage() {
             {diasRestantes <= 0 && <p className="text-xs text-red-400">Vencida hace {Math.abs(diasRestantes)} días</p>}
           </div>
         </div>
+        <DesgloseSuscripcion precio={sus?.precio_mensual || 300} />
       </div>
 
       {/* Créditos OCR */}
