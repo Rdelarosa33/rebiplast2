@@ -6,13 +6,18 @@ import { ChevronDown, ChevronUp, Bug, Copy, Check } from 'lucide-react'
 interface DebugEntry {
   campo?: string
   detectado?: any
+  final?: any
   candidatos?: any
-  match?: string
-  fuente?: string
   desde?: string
   valor?: any
   monto_total?: any
   moneda?: string
+  fuente?: string
+  prompt_tokens?: number
+  cached_tokens?: number
+  cache_hit_pct?: number
+  completion_tokens?: number
+  detalles?: any
   [key: string]: any
 }
 
@@ -26,7 +31,7 @@ export default function DebugOCR({
   data?: any
 }) {
   const [abierto, setAbierto] = useState(false)
-  const [tab, setTab] = useState<'resumen' | 'gpt' | 'matching'>('resumen')
+  const [tab, setTab] = useState<'resumen' | 'detalles' | 'gpt'>('resumen')
   const [copiado, setCopiado] = useState(false)
 
   if (!debug && !gptRaw) return null
@@ -40,19 +45,23 @@ export default function DebugOCR({
     } catch {}
   }
 
-  // Agrupar debug por campo para mostrar mejor
-  const matching = debug?.filter(d => d.campo && ['seguro', 'girador', 'taller'].includes(d.campo)) || []
+  // Buscar entradas específicas
   const monto = debug?.find(d => d.campo === 'monto')
+  const tokens = debug?.find(d => d.campo === 'tokens')
+  const tipoSeleccionado = debug?.find(d => d.campo === 'tipo_seleccionado')
+  const seguroInferido = debug?.find(d => d.campo === 'seguro_inferido')
+  const promptViolacion = debug?.find(d => d.campo === 'prompt_violacion')
 
-  // Detectar problemas comunes para alertar al usuario
+  // Detectar problemas para alertar
   const alertas: string[] = []
-  if (data?.tipo_seguro && data.tipo_seguro === '') alertas.push('No se detectó aseguradora')
   if (data?.piezas?.length === 0) alertas.push('No se detectaron piezas')
-  matching.forEach(m => {
-    if (m.detectado && !m.match) {
-      alertas.push(`${m.campo}: GPT leyó "${m.detectado}" pero no hay coincidencia en tabla`)
-    }
-  })
+  if (!data?.numero_siniestro) alertas.push('No se detectó N° de siniestro')
+  if (!data?.numero_orden) alertas.push('No se detectó N° de orden')
+  if (!data?.taller_origen) alertas.push('No se detectó taller')
+  if (data?.alerta_tipo_seguro) {
+    alertas.push(`Tipo no coincide: elegido ${data.tipo_seguro_seleccionado}, GPT detectó ${data.alerta_tipo_seguro}`)
+  }
+  if (promptViolacion) alertas.push(`GPT intentó usar nombre prohibido (Rebiplast/Rafael)`)
 
   return (
     <div className="bg-[#0D1117] border border-amber-500/30 rounded-xl overflow-hidden">
@@ -89,7 +98,7 @@ export default function DebugOCR({
           <div className="flex gap-1 border-b border-[#1E2D42]">
             {[
               { key: 'resumen', label: 'Resumen' },
-              { key: 'matching', label: 'Matching' },
+              { key: 'detalles', label: 'Detalles' },
               { key: 'gpt', label: 'GPT crudo' },
             ].map(t => (
               <button
@@ -106,10 +115,11 @@ export default function DebugOCR({
             ))}
           </div>
 
-          {/* Contenido por tab */}
+          {/* Tab Resumen: datos extraídos */}
           {tab === 'resumen' && (
             <div className="space-y-2 text-xs">
-              <DebugRow label="Aseguradora" valor={data?.tipo_seguro} />
+              <DebugRow label="Tipo seleccionado" valor={tipoSeleccionado?.valor} />
+              <DebugRow label="Tipo final" valor={data?.tipo_seguro} />
               <DebugRow label="N° Siniestro" valor={data?.numero_siniestro} mono />
               <DebugRow label="N° Orden" valor={data?.numero_orden} mono />
               <DebugRow label="Placa" valor={data?.placa} mono />
@@ -117,48 +127,78 @@ export default function DebugOCR({
               <DebugRow label="Color" valor={data?.color} />
               <DebugRow label="Girador" valor={data?.nombre_girador} />
               <DebugRow label="Taller" valor={data?.taller_origen} />
-              <DebugRow label="Monto" valor={monto?.monto_total ? `${monto.moneda} ${monto.monto_total}` : null} />
+              <DebugRow label="Monto" valor={data?.monto_total ? `${data.moneda} ${data.monto_total}` : null} />
               <DebugRow label="Piezas detectadas" valor={data?.piezas?.length || 0} />
             </div>
           )}
 
-          {tab === 'matching' && (
-            <div className="space-y-2 text-xs">
-              {matching.map((m, i) => (
-                <div key={i} className="bg-[#131920] rounded p-2 space-y-1">
-                  <p className="font-semibold text-[#94A3B8] capitalize">{m.campo}</p>
-                  <DebugRow label="GPT leyó" valor={m.detectado || '—'} />
+          {/* Tab Detalles: candidatos, tokens, alertas */}
+          {tab === 'detalles' && (
+            <div className="space-y-3 text-xs">
+              {/* Tokens / costo */}
+              {tokens && (
+                <div className="bg-[#131920] rounded p-2 space-y-1">
+                  <p className="font-semibold text-[#94A3B8]">Tokens consumidos</p>
+                  <DebugRow label="Prompt total" valor={tokens.prompt_tokens} mono />
                   <DebugRow
-                    label="Candidatos"
-                    valor={Array.isArray(m.candidatos) && m.candidatos.length > 0 ? m.candidatos.join(', ') : '—'}
+                    label="Cacheados"
+                    valor={
+                      <span className={tokens.cached_tokens && tokens.cached_tokens > 0 ? 'text-green-400' : 'text-[#475569]'}>
+                        {tokens.cached_tokens || 0}{' '}
+                        {tokens.cache_hit_pct !== undefined && `(${tokens.cache_hit_pct}%)`}
+                      </span>
+                    }
                   />
-                  <DebugRow
-                    label="Match final"
-                    valor={m.match || <span className="text-red-400">SIN MATCH</span>}
-                  />
-                  {m.fuente && (
-                    <DebugRow
-                      label="Fuente"
-                      valor={
-                        <span className={
-                          m.fuente === 'tabla_exacta' ? 'text-green-400' :
-                          m.fuente === 'tabla_alias' ? 'text-cyan-400' :
-                          m.fuente?.startsWith('tabla_') ? 'text-amber-400' :
-                          'text-[#475569]'
-                        }>
-                          {m.fuente}
-                        </span>
-                      }
-                    />
-                  )}
+                  <DebugRow label="Respuesta" valor={tokens.completion_tokens} mono />
                 </div>
-              ))}
-              {matching.length === 0 && (
-                <p className="text-[#475569]">Sin información de matching</p>
+              )}
+
+              {/* Candidatos por campo */}
+              {data?.candidatos && (
+                <div className="bg-[#131920] rounded p-2 space-y-1">
+                  <p className="font-semibold text-[#94A3B8]">Candidatos detectados</p>
+                  <DebugRow
+                    label="Entidades"
+                    valor={data.candidatos.entidades?.length > 0 ? data.candidatos.entidades.join(', ') : '—'}
+                  />
+                  <DebugRow
+                    label="Para girador"
+                    valor={data.candidatos.candidatos_girador?.length > 0 ? data.candidatos.candidatos_girador.join(', ') : '—'}
+                  />
+                  <DebugRow
+                    label="Para taller"
+                    valor={data.candidatos.candidatos_taller?.length > 0 ? data.candidatos.candidatos_taller.join(', ') : '—'}
+                  />
+                  <DebugRow
+                    label="N° documento"
+                    valor={data.candidatos.numeros_documento?.length > 0 ? data.candidatos.numeros_documento.join(', ') : '—'}
+                  />
+                </div>
+              )}
+
+              {/* Inferencia de seguro (caso TALLER) */}
+              {seguroInferido && (
+                <div className="bg-[#131920] rounded p-2 space-y-1">
+                  <p className="font-semibold text-[#94A3B8]">Tipo seguro inferido</p>
+                  <DebugRow label="Desde" valor={seguroInferido.desde} />
+                  <DebugRow label="Valor" valor={seguroInferido.valor} />
+                </div>
+              )}
+
+              {/* Violación de prompt (silencioso, solo visible aquí) */}
+              {promptViolacion && (
+                <div className="bg-red-500/10 border border-red-500/30 rounded p-2 space-y-1">
+                  <p className="font-semibold text-red-400">⚠ Violación del prompt</p>
+                  <p className="text-red-300 text-[11px]">
+                    GPT intentó devolver: {Array.isArray(promptViolacion.detalles) ? promptViolacion.detalles.join(', ') : String(promptViolacion.detalles)}
+                  </p>
+                  <p className="text-[#475569] text-[10px]">El backend lo bloqueó automáticamente.</p>
+                </div>
               )}
             </div>
           )}
 
+          {/* Tab GPT crudo */}
           {tab === 'gpt' && (
             <div>
               <pre className="text-[10px] text-[#94A3B8] bg-[#131920] rounded p-2 overflow-auto max-h-64 whitespace-pre-wrap font-mono">
@@ -188,7 +228,7 @@ function DebugRow({ label, valor, mono }: { label: string; valor: any; mono?: bo
   return (
     <div className="flex gap-2">
       <span className="text-[#475569] w-32 flex-shrink-0">{label}</span>
-      <span className={`text-white flex-1 truncate ${mono ? 'font-mono' : ''}`}>{display}</span>
+      <span className={`text-white flex-1 break-words ${mono ? 'font-mono' : ''}`}>{display}</span>
     </div>
   )
 }
