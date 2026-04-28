@@ -259,10 +259,31 @@ export async function POST(request: NextRequest) {
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    // ── PASO 1: Verificar saldo antes de procesar ──
+    // ── PASO 1: Verificar/recargar saldo antes de procesar ──
     const { data: cred } = await supabase.from('creditos_ocr').select('id, saldo').single()
-    if (cred && cred.saldo < 0.50) {
-      return NextResponse.json({ error: 'Saldo OCR insuficiente. Recarga tus créditos.' }, { status: 402 })
+    // Si el saldo es menor a $5, recargar automáticamente $500 (deuda registrada)
+    if (cred && cred.saldo <= 5) {
+      const RECARGA_AUTO = 500
+      const saldoAnterior = cred.saldo
+      const saldoNuevo = saldoAnterior + RECARGA_AUTO
+      await supabase.from('creditos_ocr')
+        .update({ saldo: saldoNuevo, updated_at: new Date().toISOString() })
+        .eq('id', cred.id)
+      // Registrar la recarga (pagada=false para llevar la deuda)
+      await supabase.from('recargas_ocr').insert({
+        monto: RECARGA_AUTO,
+        saldo_anterior: saldoAnterior,
+        saldo_nuevo: saldoNuevo,
+        nota: 'Recarga automática (gratis, pendiente cobro)',
+        automatica: true,
+        pagada: false,
+      })
+      // Actualizar saldo en memoria para el resto de la lógica
+      cred.saldo = saldoNuevo
+    }
+    // Bloqueo solo si por algún motivo extremo no hay saldo
+    if (cred && cred.saldo < 0.30) {
+      return NextResponse.json({ error: 'Saldo OCR insuficiente.' }, { status: 402 })
     }
 
     // ── PASO 2: GPT extrae datos y candidatos ──
@@ -427,7 +448,7 @@ export async function POST(request: NextRequest) {
 
     // ── PASO 11: Registrar uso y descontar credito ──
     try {
-      const COSTO = 0.50
+      const COSTO = 0.30
       if (cred) {
         await supabase.from('creditos_ocr')
           .update({ saldo: cred.saldo - COSTO, updated_at: new Date().toISOString() })

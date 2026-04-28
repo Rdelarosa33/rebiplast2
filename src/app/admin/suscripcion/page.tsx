@@ -33,6 +33,15 @@ export default async function SuscripcionPage() {
   const escaneosExitosos = usoMes?.filter((u: any) => u.exitoso).length || 0
   const escaneosFallidos = usoMes?.filter((u: any) => !u.exitoso).length || 0
 
+  // Deuda acumulada (recargas automáticas pendientes de cobro)
+  const { data: deudaData } = await supabase
+    .from('recargas_ocr')
+    .select('monto')
+    .eq('automatica', true)
+    .eq('pagada', false)
+  const deudaTotal = deudaData?.reduce((acc: number, r: any) => acc + (Number(r.monto) || 0), 0) || 0
+  const recargasPendientes = deudaData?.length || 0
+
   return (
     <div className="space-y-5 max-w-2xl mx-auto">
       <div>
@@ -92,13 +101,36 @@ export default async function SuscripcionPage() {
             <p className="text-xs text-[#475569]">Gastado este mes</p>
           </div>
         </div>
-        <p className="text-[10px] text-[#475569] text-center mt-2">$0.50 por escaneo</p>
+        <p className="text-[10px] text-[#475569] text-center mt-2">$0.30 por escaneo · Recarga automática $500 cuando saldo ≤ $5</p>
         {(cred?.saldo || 0) < 10 && (
           <div className="mt-3 bg-orange-500/10 border border-orange-500/30 rounded-xl p-3">
-            <p className="text-sm text-orange-400">⚠ Saldo bajo — quedan {Math.floor((cred?.saldo || 0) / 0.5)} escaneos disponibles</p>
+            <p className="text-sm text-orange-400">⚠ Saldo bajo — quedan {Math.floor((cred?.saldo || 0) / 0.3)} escaneos disponibles</p>
           </div>
         )}
       </div>
+
+      {/* Deuda acumulada por recargas automáticas */}
+      {deudaTotal > 0 && (
+        <div className="card p-5 border-amber-500/30">
+          <div className="flex items-center gap-2 mb-4">
+            <RefreshCw size={18} className="text-amber-400" />
+            <h2 className="font-syne font-semibold text-white">Recargas automáticas pendientes de cobro</h2>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 text-center">
+              <p className="text-3xl font-syne font-bold text-amber-400">${deudaTotal.toFixed(2)}</p>
+              <p className="text-xs text-[#475569] mt-1">Deuda acumulada</p>
+            </div>
+            <div className="bg-[#131920] rounded-xl p-3 text-center">
+              <p className="text-3xl font-syne font-bold text-white">{recargasPendientes}</p>
+              <p className="text-xs text-[#475569] mt-1">Recargas pendientes</p>
+            </div>
+          </div>
+          <p className="text-[10px] text-[#475569] text-center mt-3">
+            Cada recarga automática registrada como gratuita queda pendiente hasta marcarla como pagada.
+          </p>
+        </div>
+      )}
 
       {/* Historial de escaneos */}
       <div className="card p-5">
@@ -146,11 +178,22 @@ export default async function SuscripcionPage() {
             {recargas.map((r: any) => (
               <div key={r.id} className="flex items-center gap-3 p-3 bg-[#131920] rounded-xl">
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-green-400">+${r.monto.toFixed(2)}</p>
-                  {r.nota && <p className="text-xs text-[#475569]">{r.nota}</p>}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-semibold text-green-400">+${Number(r.monto).toFixed(2)}</p>
+                    {r.automatica && (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
+                        r.pagada
+                          ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                          : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                      }`}>
+                        {r.pagada ? 'AUTO PAGADA' : 'AUTO PENDIENTE'}
+                      </span>
+                    )}
+                  </div>
+                  {r.nota && <p className="text-xs text-[#475569] mt-0.5">{r.nota}</p>}
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-white">Saldo: ${r.saldo_nuevo?.toFixed(2)}</p>
+                  <p className="text-xs text-white">Saldo: ${Number(r.saldo_nuevo)?.toFixed(2)}</p>
                   <p className="text-xs text-[#475569]">
                     {new Date(r.created_at).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: '2-digit' })}
                   </p>
