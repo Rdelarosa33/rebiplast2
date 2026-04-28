@@ -38,6 +38,7 @@ export default function NuevoSiniestroPage() {
   const [imagenPreview, setImagenPreview] = useState<string | null>(null)
   const [formKey, setFormKey] = useState(0)
   const [scanResult, setScanResult] = useState<{ data?: any; debug?: any[]; gpt_raw?: string } | null>(null)
+  const [advertenciaCalidad, setAdvertenciaCalidad] = useState<{ problemas: string[]; archivo: File } | null>(null)
   const [candidatos, setCandidatos] = useState<{
     seguros: string[];
     entidades: string[];
@@ -89,7 +90,96 @@ export default function NuevoSiniestroPage() {
     })
   }
 
+  // Validar calidad de imagen ANTES de subir al servidor
+  // Retorna lista de problemas encontrados (vacío = OK)
+  const validarCalidadImagen = (file: File): Promise<string[]> => {
+    return new Promise((resolve) => {
+      const problemas: string[] = []
+
+      // 1. Tipo de archivo
+      const tiposValidos = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic']
+      if (!tiposValidos.includes(file.type) && !file.name.match(/\.(jpe?g|png|webp|heic)$/i)) {
+        problemas.push('Tipo de archivo no soportado (usar JPG, PNG, WEBP)')
+        return resolve(problemas)
+      }
+
+      // 2. Tamaño en bytes
+      const KB = 1024
+      const MB = 1024 * KB
+      if (file.size < 50 * KB) {
+        problemas.push(`Archivo muy pequeño (${Math.round(file.size / KB)}KB, mínimo 50KB)`)
+      }
+      if (file.size > 15 * MB) {
+        problemas.push(`Archivo muy grande (${Math.round(file.size / MB)}MB, máximo 15MB)`)
+      }
+
+      // 3. Dimensiones y brillo (requiere cargar la imagen)
+      const img = new Image()
+      const url = URL.createObjectURL(file)
+
+      img.onload = () => {
+        // Resolución mínima: 600px en el lado más corto
+        const ladoCorto = Math.min(img.width, img.height)
+        if (ladoCorto < 600) {
+          problemas.push(`Resolución baja: ${img.width}×${img.height} (recomendado: 600px+ en lado corto)`)
+        }
+
+        // Análisis de brillo: dibujar imagen pequeña en canvas y promediar pixels
+        try {
+          const canvas = document.createElement('canvas')
+          const sampleSize = 100
+          canvas.width = sampleSize
+          canvas.height = sampleSize
+          const ctx = canvas.getContext('2d')
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, sampleSize, sampleSize)
+            const data = ctx.getImageData(0, 0, sampleSize, sampleSize).data
+            let sumaBrillo = 0
+            let pixeles = 0
+            for (let i = 0; i < data.length; i += 4) {
+              // Luminancia perceptual
+              const l = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114
+              sumaBrillo += l
+              pixeles++
+            }
+            const brilloPromedio = sumaBrillo / pixeles  // 0-255
+
+            if (brilloPromedio < 40) {
+              problemas.push('Imagen muy oscura (necesita más luz)')
+            } else if (brilloPromedio > 235) {
+              problemas.push('Imagen muy clara o sobre-expuesta')
+            }
+          }
+        } catch (e) {
+          // Si falla canvas (CORS u otra cosa), no bloqueamos
+        }
+
+        URL.revokeObjectURL(url)
+        resolve(problemas)
+      }
+
+      img.onerror = () => {
+        problemas.push('No se pudo leer el archivo como imagen')
+        URL.revokeObjectURL(url)
+        resolve(problemas)
+      }
+
+      img.src = url
+    })
+  }
+
   const procesarImagen = async (file: File) => {
+    // Validación de calidad ANTES de subir al servidor (ahorra OCR si está mala)
+    const problemas = await validarCalidadImagen(file)
+    if (problemas.length > 0) {
+      setAdvertenciaCalidad({ problemas, archivo: file })
+      return
+    }
+    // Si pasa validación, procesar directo
+    procesarImagenInterno(file)
+  }
+
+  const procesarImagenInterno = async (file: File) => {
     setScanLoading(true)
     setError('')
     const reader = new FileReader()
@@ -582,6 +672,55 @@ export default function NuevoSiniestroPage() {
                 ? <><Loader2 size={16} className="animate-spin" /> Registrando...</>
                 : <><Check size={16} /> Confirmar e imprimir QR</>}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal advertencia calidad foto */}
+      {advertenciaCalidad && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0D1117] border border-amber-500/30 rounded-2xl p-5 max-w-md w-full space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                <span className="text-amber-400 text-xl">⚠</span>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-syne font-bold text-white">Foto puede no leerse bien</h3>
+                <p className="text-xs text-[#94A3B8] mt-1">El sistema detectó:</p>
+              </div>
+            </div>
+
+            <ul className="space-y-1.5 bg-[#131920] rounded-xl p-3">
+              {advertenciaCalidad.problemas.map((p, i) => (
+                <li key={i} className="text-xs text-amber-300 flex items-start gap-2">
+                  <span className="text-amber-400 flex-shrink-0">•</span>
+                  <span>{p}</span>
+                </li>
+              ))}
+            </ul>
+
+            <p className="text-xs text-[#475569]">
+              Tomar otra foto suele dar mejor resultado y ahorra créditos OCR.
+            </p>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setAdvertenciaCalidad(null)}
+                className="flex-1 btn-primary text-sm py-2"
+              >
+                Tomar otra foto
+              </button>
+              <button
+                onClick={() => {
+                  const archivo = advertenciaCalidad.archivo
+                  setAdvertenciaCalidad(null)
+                  procesarImagenInterno(archivo)
+                }}
+                className="text-sm bg-[#131920] border border-[#1E2D42] text-[#94A3B8] hover:text-white px-4 py-2 rounded-lg"
+              >
+                Continuar igual
+              </button>
+            </div>
           </div>
         </div>
       )}
