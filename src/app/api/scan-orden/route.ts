@@ -78,9 +78,30 @@ function matchConLista(candidatos: string[], registros: any[], campoNombre: stri
 
   const cands = [...candidatos].sort((a, b) => b.length - a.length)
 
+  // ─── PASADA 1: solo coincidencias EXACTAS en todos los registros ───
+  // Esto previene que un match parcial gane sobre uno exacto que existe más adelante en la lista
   for (const cand of cands) {
     if (!cand || estaProhibido(cand)) continue
     const candNorm = normalizar(cand)
+
+    for (const reg of registros) {
+      const nombre = reg[campoNombre] || ''
+      const nombreNorm = normalizar(nombre)
+      const alias: string[] = (reg.alias || []).map((a: string) => normalizar(a))
+
+      // Exacto nombre oficial
+      if (candNorm === nombreNorm) return { nombre, fuente: 'tabla_exacta' }
+
+      // Exacto en alias
+      if (alias.some(a => candNorm === a)) return { nombre, fuente: 'tabla_alias' }
+    }
+  }
+
+  // ─── PASADA 2: coincidencias parciales (más laxo) ───
+  for (const cand of cands) {
+    if (!cand || estaProhibido(cand)) continue
+    const candNorm = normalizar(cand)
+    const palabrasCand = candNorm.split(' ').filter(p => p.length > 2)
 
     const regs = [...registros].sort((a, b) =>
       (b[campoNombre]?.length || 0) - (a[campoNombre]?.length || 0)
@@ -91,28 +112,28 @@ function matchConLista(candidatos: string[], registros: any[], campoNombre: stri
       const nombreNorm = normalizar(nombre)
       const alias: string[] = (reg.alias || []).map((a: string) => normalizar(a))
 
-      // 1. Exacto nombre oficial
-      if (candNorm === nombreNorm) return { nombre, fuente: 'tabla_exacta' }
-
-      // 2. Exacto en alias
-      if (alias.some(a => candNorm === a)) return { nombre, fuente: 'tabla_alias' }
-
-      // 3. Parcial nombre oficial
-      if (candNorm.includes(nombreNorm) || nombreNorm.includes(candNorm)) {
-        return { nombre, fuente: 'tabla_parcial' }
+      // Parcial nombre oficial - requiere que UNO contenga al OTRO COMPLETO
+      // Ej: "TOYO SERVICE SA" contiene "TOYO SERVICE" ✓ pero "PANA SM TOYO SM" NO contiene "TOYO SERVICE" ✗
+      if (candNorm.length >= 4 && nombreNorm.length >= 4) {
+        if (candNorm.includes(nombreNorm) || nombreNorm.includes(candNorm)) {
+          return { nombre, fuente: 'tabla_parcial' }
+        }
       }
 
-      // 4. Parcial en alias
-      if (alias.some(a => candNorm.includes(a) || a.includes(candNorm))) {
+      // Parcial en alias
+      if (alias.some(a => a.length >= 4 && (candNorm.includes(a) || a.includes(candNorm)))) {
         return { nombre, fuente: 'tabla_alias' }
       }
 
-      // 5. Por palabras — más estricto: al menos la mitad de palabras del nombre
+      // Por palabras - MUY ESTRICTO ahora:
+      // Requiere que TODAS las palabras del candidato estén presentes en el registro
+      // Y que sean al menos 2 palabras (palabras únicas no califican)
       const palabrasNombre = nombreNorm.split(' ').filter(p => p.length > 2)
-      const palabrasCand = candNorm.split(' ').filter(p => p.length > 2)
-      const matches = palabrasNombre.filter(p => palabrasCand.includes(p))
-      if (palabrasNombre.length > 0 && matches.length >= Math.ceil(palabrasNombre.length / 2)) {
-        return { nombre, fuente: 'tabla_palabras' }
+      if (palabrasCand.length >= 2 && palabrasNombre.length >= 2) {
+        const todasMatch = palabrasCand.every(p => palabrasNombre.includes(p))
+        if (todasMatch) {
+          return { nombre, fuente: 'tabla_palabras' }
+        }
       }
     }
   }
@@ -267,24 +288,51 @@ leer todas las palabras visibles aunque algunas estén borrosas. Es mejor
 incluir el nombre completo aunque tenga que adivinar 1-2 letras.
 
 ═══════════════════════════════════════════════════════════════
-MONTOS (importante: extraer SIEMPRE)
+MONTOS (CRÍTICO: extraer SIEMPRE - no dejar null si hay un número)
 ═══════════════════════════════════════════════════════════════
 
-monto_total: el TOTAL del documento.
-- Buscar en: "TOTAL (US$)", "Precio Total S/", "TOTAL", "Monto Total", "Total a Facturar"
-- Es el SUBTOTAL si no hay TOTAL con IGV
-- Si el documento muestra montos en USD y soles, prioriza USD si está marcado "US$" o "Dólares Americanos"
+monto_total: el TOTAL del documento. ESTE CAMPO ES CRÍTICO, NO LO DEJES NULL.
+Pasos para encontrarlo:
+
+1. PRIMERO buscar la palabra "TOTAL" en el documento (puede aparecer como):
+   - "TOTAL (US$)"
+   - "TOTAL (S/)"
+   - "TOTAL"
+   - "Total"
+   - "Precio Total"
+   - "TOTAL A FACTURAR"
+   - "Monto Aprobado"
+   El número que está al lado/debajo de "TOTAL" es el monto_total.
+
+2. SI NO HAY "TOTAL" explícito, usar "SUBTOTAL":
+   - "SUBTOTAL (US$)"
+   - "SUB TOTAL"
+   - "Sub Total"
+
+3. SI NO HAY ninguno, sumar los precios de todas las piezas individuales.
+
+EJEMPLOS REALES:
+- Documento RIMAC con "SUBTOTAL (US$): 30.00 / IGV (US$): 5.40 / TOTAL (US$): 35.40"
+  → monto_total = 35.40
+- Documento Pacífico con "Precio Total S/: 80.00"
+  → monto_total = 80.00
+- Documento La Positiva con tabla de precios sin total → suma de precios
+
+NO RETORNES null SI EL DOCUMENTO TIENE NÚMEROS QUE PARECEN MONTOS.
+Lee la imagen completa - los montos suelen estar en una tabla al final 
+o al lado derecho de cada pieza. NO te saltes este campo.
 
 moneda: "USD" o "PEN" según corresponda.
 - Pistas USD: "US$", "Dólares", "Dólares Americanos", "$"
 - Pistas PEN: "S/", "Soles", "Nuevos Soles"
+- Si no hay pista clara, usar "USD"
 
 monto por pieza: cada pieza puede tener su propio costo.
-- Buscar columna "PRECIO TOTAL", "Monto", "PRECIO", "Importe" al lado de cada descripción
+- Buscar columna "PRECIO TOTAL", "Monto", "PRECIO", "Importe", "PRECIO UNIT" 
+  al lado de cada descripción
 - Si una pieza no tiene precio individual claro, dejar monto = null
 - Si solo hay un total general (ej: 4 piezas comparten un solo monto $100), 
-  poner el total dividido entre las piezas en cada una, O dejar null y 
-  poner el total en monto_total únicamente
+  dejar monto = null en cada pieza y poner el total en monto_total únicamente
 
 LADOS:
 - "LH", "IZQ", "Izquierdo" → lado = "LH"
@@ -639,11 +687,26 @@ export async function POST(request: NextRequest) {
     })
 
     // ── PASO 10: Construir resultado final ──
-    // Taller: priorizar match en tabla, pero si GPT leyó un nombre no prohibido, usarlo como fallback
-    let tallerFinal: string | null = tallMatch.nombre || null
-    if (!tallerFinal && data.taller_origen && !estaProhibido(data.taller_origen)) {
-      tallerFinal = data.taller_origen
+    // Estrategia para taller y girador:
+    // - Si GPT detectó un nombre claro (>= 4 chars) Y el match en BD es por "tabla_palabras"
+    //   (la fuente más débil), preferir lo que GPT detectó.
+    // - Si match es exacto/alias/parcial, usar BD.
+    // - Si no hay match pero GPT tiene algo válido, usar GPT.
+
+    const elegirMejor = (matchNombre: string, matchFuente: any, gptValor: string | null): string | null => {
+      // Si match es débil (palabras) y GPT tiene un valor más largo o específico, preferir GPT
+      if (matchFuente === 'tabla_palabras' && gptValor && gptValor.length >= 4 && !estaProhibido(gptValor)) {
+        return gptValor  // GPT vio algo claro, no confiamos en match débil
+      }
+      // Si hay match (cualquier nivel), usarlo
+      if (matchNombre) return matchNombre
+      // Sin match: usar GPT si es válido
+      if (gptValor && !estaProhibido(gptValor)) return gptValor
+      return null
     }
+
+    const tallerFinal = elegirMejor(tallMatch.nombre, tallMatch.fuente, data.taller_origen)
+    const giradorFinal = elegirMejor(girMatch.nombre, girMatch.fuente, data.nombre_girador)
 
     const output: any = {
       numero_siniestro: data.numero_siniestro || null,
@@ -652,7 +715,7 @@ export async function POST(request: NextRequest) {
       placa: data.placa || null,
       color: data.color || null,
       tipo_seguro: tipoSeguroFinal || null,
-      nombre_girador: girMatch.nombre || (!estaProhibido(data.nombre_girador || '') ? data.nombre_girador : null),
+      nombre_girador: giradorFinal,
       taller_origen: tallerFinal,
       monto_total,
       moneda,
