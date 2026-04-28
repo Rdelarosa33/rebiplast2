@@ -38,6 +38,8 @@ export default function NuevoSiniestroPage() {
   const [imagenPreview, setImagenPreview] = useState<string | null>(null)
   const [formKey, setFormKey] = useState(0)
   const [scanResult, setScanResult] = useState<{ data?: any; debug?: any[]; gpt_raw?: string } | null>(null)
+  const [candidatos, setCandidatos] = useState<{ seguros: string[]; giradores: string[]; talleres: string[] }>({ seguros: [], giradores: [], talleres: [] })
+  const [camposDetectados, setCamposDetectados] = useState<{ tipo_seguro: boolean; nombre_girador: boolean; taller_origen: boolean }>({ tipo_seguro: false, nombre_girador: false, taller_origen: false })
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
 
@@ -102,6 +104,18 @@ export default function NuevoSiniestroPage() {
         return
       }
       const d = result.data
+      // Guardar candidatos para sugerencias de UI
+      setCandidatos({
+        seguros: d.candidatos?.seguros || [],
+        giradores: d.candidatos?.giradores || [],
+        talleres: d.candidatos?.talleres || [],
+      })
+      // Marcar qué campos detectó el OCR (vs cuáles vienen vacíos)
+      setCamposDetectados({
+        tipo_seguro: !!d.tipo_seguro,
+        nombre_girador: !!d.nombre_girador,
+        taller_origen: !!d.taller_origen,
+      })
       setForm(prev => ({
         ...prev,
         numero_siniestro: d.numero_siniestro || prev.numero_siniestro,
@@ -189,6 +203,8 @@ export default function NuevoSiniestroPage() {
   const limpiarFormulario = () => {
     setImagenPreview(null)
     setScanResult(null)
+    setCandidatos({ seguros: [], giradores: [], talleres: [] })
+    setCamposDetectados({ tipo_seguro: false, nombre_girador: false, taller_origen: false })
     setFormKey(k => k + 1)
     setForm({
       numero_siniestro: '', numero_orden: '', expediente: '', poliza: '',
@@ -310,12 +326,50 @@ export default function NuevoSiniestroPage() {
           <div className="card p-5 space-y-4">
             <h2 className="font-syne font-semibold text-white">Seguro</h2>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className="label">Compañía *</label>
-                <select className="input-field" value={form.tipo_seguro} onChange={e => setForm({...form, tipo_seguro: e.target.value, nombre_girador: e.target.value === 'INTERSEGURO' ? 'José Fernández' : form.nombre_girador})}>
+              <div>
+                <label className="label flex items-center gap-2">
+                  Compañía *
+                  {scanResult && (camposDetectados.tipo_seguro
+                    ? <span className="text-[9px] bg-green-500/20 text-green-400 border border-green-500/30 px-1.5 py-0.5 rounded">DETECTADO</span>
+                    : <span className="text-[9px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded">REVISAR</span>
+                  )}
+                </label>
+                <select className="input-field" value={form.tipo_seguro} onChange={e => setForm({...form, tipo_seguro: e.target.value})}>
                   {SEGUROS.map(s => <option key={s} value={s}>{s}</option>)}
-                </select></div>
-              <div><label className="label">Girador</label>
-                <input className="input-field" value={form.nombre_girador} onChange={e => setForm({...form, nombre_girador: e.target.value})} /></div>
+                </select>
+                {candidatos.seguros.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {candidatos.seguros.slice(0, 4).map((c, i) => (
+                      <button key={i} type="button"
+                        onClick={() => setForm({...form, tipo_seguro: c.toUpperCase().replace(/\s+/g, '_')})}
+                        className="text-[10px] bg-[#131920] border border-[#1E2D42] text-[#94A3B8] hover:text-[#00D4FF] hover:border-[#00D4FF]/50 rounded px-2 py-0.5">
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="label flex items-center gap-2">
+                  Girador
+                  {scanResult && (camposDetectados.nombre_girador
+                    ? <span className="text-[9px] bg-green-500/20 text-green-400 border border-green-500/30 px-1.5 py-0.5 rounded">DETECTADO</span>
+                    : <span className="text-[9px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded">REVISAR</span>
+                  )}
+                </label>
+                <input className="input-field" value={form.nombre_girador} onChange={e => setForm({...form, nombre_girador: e.target.value})} />
+                {candidatos.giradores.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {candidatos.giradores.slice(0, 4).map((c, i) => (
+                      <button key={i} type="button"
+                        onClick={() => setForm({...form, nombre_girador: c})}
+                        className="text-[10px] bg-[#131920] border border-[#1E2D42] text-[#94A3B8] hover:text-[#00D4FF] hover:border-[#00D4FF]/50 rounded px-2 py-0.5 truncate max-w-full">
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
           </div>
@@ -323,8 +377,27 @@ export default function NuevoSiniestroPage() {
           <div className="card p-5 space-y-4">
             <h2 className="font-syne font-semibold text-white">Taller y fecha</h2>
             <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2"><label className="label">Taller de origen *</label>
-                <input className="input-field" value={form.taller_origen} onChange={e => setForm({...form, taller_origen: e.target.value})} placeholder="Ej: Maquinarias SM" /></div>
+              <div className="col-span-2">
+                <label className="label flex items-center gap-2">
+                  Taller de origen *
+                  {scanResult && (camposDetectados.taller_origen
+                    ? <span className="text-[9px] bg-green-500/20 text-green-400 border border-green-500/30 px-1.5 py-0.5 rounded">DETECTADO</span>
+                    : <span className="text-[9px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded">REVISAR</span>
+                  )}
+                </label>
+                <input className="input-field" value={form.taller_origen} onChange={e => setForm({...form, taller_origen: e.target.value})} placeholder="Ej: Maquinarias SM" />
+                {candidatos.talleres.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {candidatos.talleres.slice(0, 4).map((c, i) => (
+                      <button key={i} type="button"
+                        onClick={() => setForm({...form, taller_origen: c})}
+                        className="text-[10px] bg-[#131920] border border-[#1E2D42] text-[#94A3B8] hover:text-[#00D4FF] hover:border-[#00D4FF]/50 rounded px-2 py-0.5 truncate max-w-full">
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div><label className="label">Fecha recojo</label>
                 <input className="input-field" type="date" value={form.fecha_recojo} onChange={e => setForm({...form, fecha_recojo: e.target.value})} /></div>
               <div><label className="label">Hora</label>

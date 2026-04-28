@@ -123,139 +123,171 @@ function matchConLista(candidatos: string[], registros: any[], campoNombre: stri
 // ============================================================
 // PROMPT
 // ============================================================
-const PROMPT = `Lee esta orden de trabajo automotriz peruana. Devuelve SOLO JSON válido.
+const PROMPT = `Eres un sistema de extracción de datos de órdenes de trabajo automotrices peruanas.
+Devuelve SOLO JSON válido siguiendo el esquema al final.
 
-═══════════════════════════════════════════════════════════
-CONCEPTOS CLAVE (NO confundir):
-═══════════════════════════════════════════════════════════
-ASEGURADORA: la compañía de seguros que paga (RIMAC/MAPFRE/PACIFICO/LA_POSITIVA/INTERSEGURO).
-GIRADOR: PERSONA o EMPRESA que FIRMA/AUTORIZA la orden (NO es el asegurado, NO es Rebiplast).
-TALLER: lugar físico donde está el carro y a donde se entrega la pieza terminada (NO es Rebiplast).
-ASEGURADO: cliente final dueño del carro. (campo opcional)
-PROVEEDOR: siempre es REBIPLAST. NUNCA usar como girador ni taller.
+═══════════════════════════════════════════════════════════════
+CONCEPTOS CLAVE (entiende qué representa cada cosa)
+═══════════════════════════════════════════════════════════════
 
-═══════════════════════════════════════════════════════════
-PASO 1 - IDENTIFICAR ASEGURADORA Y APLICAR REGLAS ESPECÍFICAS
-═══════════════════════════════════════════════════════════
+ASEGURADORA: la compañía de seguros que pagará el trabajo. 
+Las más comunes: RIMAC, MAPFRE, PACIFICO, LA_POSITIVA, INTERSEGURO.
+Otras posibles: cualquier compañía de seguros peruana.
 
-▸ REGLA GENERAL DEL HEADER:
-Si el HEADER (logo arriba) NO es una aseguradora conocida (RIMAC/MAPFRE/PACIFICO/LA POSITIVA/INTERSEGURO),
-entonces el HEADER ES EL TALLER (taller_origen).
-La aseguradora real estará dentro del documento en campos como "Cia Seguro:", "Facturar a:", etc.
+GIRADOR: la PERSONA o EMPRESA que firma/autoriza la orden de trabajo.
+Pistas para identificarlo: aparece junto a firma, sello, o títulos como
+"AUTORIZADO", "TÉCNICO", "PERITO", "ASESOR", "RESPONSABLE", "REALIZADO POR",
+"AUTORIZADO POR", "JEFE DE SINIESTROS", "TÉCNICO SINIESTROS VEHÍCULOS",
+"Técnico de Vehículos", o similar.
+Si hay varios candidatos: el girador es quien tiene cargo o firma asociada.
+NUNCA es Rebiplast. NUNCA es el asegurado/cliente.
 
-Ejemplos de headers que SON TALLERES (no aseguradoras):
-- "EA Corp SAC" → taller, aseguradora se busca en "Cia Seguro:"
-- "Qualität - Asesoría y Servicios Empresariales" → taller, aseguradora se busca en "Facturar a:"
-- Cualquier RUC/empresa que no sea aseguradora conocida
+TALLER: lugar físico donde está el carro y a donde se entrega la pieza terminada.
+Pistas: aparece como "ATENCIÓN A TALLER", "TALLER PRINCIPAL", "TALLER", 
+"ENTREGAR A", "Sirvase entregar...a los señores ___", "Cliente Taller",
+o como header de la empresa cuando esa empresa NO es una aseguradora.
+NUNCA es Rebiplast (Rebiplast es el proveedor que recibe la pieza).
 
-▸ RIMAC (logo "RIMAC" arriba a la derecha):
-  - tipo_seguro = "RIMAC"
-  - nombre_girador = nombre que aparece en "AUTORIZADO:" o "TÉCNICO:" o "TÉCNICO SINIESTROS VEHICULOS" (al final, junto a la firma)
-  - taller_origen = valor del campo "ATENCIÓN A TALLER" o "Sres:" (NUNCA "REBIPLAST")
-  - numero_siniestro = campo "SINIESTRO:" o "Siniestro N°"
-  - numero_orden = "NRO DE OC" o "N°" (al inicio)
+ASEGURADO: cliente final dueño del carro. Aparece en "Asegurado:", 
+"Cliente:", "Afectado:", "Sr.:". Campo opcional.
 
-▸ MAPFRE (logo rojo "MAPFRE | PERÚ"):
-  - tipo_seguro = "MAPFRE"
-  - nombre_girador = el nombre del PERITO (busca al final: "* Perito: APELLIDO NOMBRE" o "MORALES PIZARRO, WILLIAM ELIO" formato apellidos primero)
-  - taller_origen = valor de "TALLER PRINCIPAL" (NO "PROVEEDOR" porque ese es Rebiplast)
-  - numero_siniestro = valor de "SINIESTRO:" (puede tener formato 100130126001462)
-  - numero_orden = valor de "ORDEN DE TRABAJO" (formato 202602030602)
+PROVEEDOR: siempre es REBIPLAST. Aparece en "PROVEEDOR:", "Razón Social Proveedor".
+NUNCA usar Rebiplast como girador ni taller.
 
-▸ LA POSITIVA (logo "La Positiva" arriba):
-  - tipo_seguro = "LA_POSITIVA"
-  - nombre_girador = nombre arriba de la firma "Técnico de Vehículos La Positiva" (ej: "Luis Miguel Cruces", "Erick Colonio García")
-  - taller_origen = el nombre que sigue a "Sirvase entregar...a los señores ___" (ej: "Alese La Marina", "Alese La Molina"). El nombre entre paréntesis (ej: "Miguel Quiñones - Asesor de Servicio") es CONTACTO del taller, NO el taller mismo.
-  - numero_siniestro = valor de "Siniestro:"
-  - numero_orden = "N° OC-..."
-  - nombre_asegurado = valor de "Asegurado:"
+═══════════════════════════════════════════════════════════════
+REGLA DE HEADER (importante)
+═══════════════════════════════════════════════════════════════
 
-▸ PACIFICO / EA Corp (header con nombre de TALLER + "Cia Seguro: Pacifico" en el documento):
-  - tipo_seguro = "PACIFICO"
-  - nombre_girador = valor de "Realizado por:" (ej: "Alex Roman")
-  - taller_origen = el NOMBRE DE LA EMPRESA EN EL HEADER arriba a la izquierda (ej: "EA Corp SAC"). NO usar el campo "Cliente:" porque ese es el asegurado.
-  - nombre_asegurado = valor de "Cliente:" (ej: "Alpiconsult S.A.C.")
-  - numero_siniestro = valor de "Siniestro:" (puede ser texto como "Colision X Cta del Seguro")
-  - numero_orden = valor de "ORDEN DE TRABAJO Nro." (ej: "OTR20262294")
+El HEADER (logo arriba del documento) puede ser:
+A) Una ASEGURADORA conocida → tipo_seguro = esa aseguradora
+   Ejemplos: RIMAC, MAPFRE, La Positiva, Pacífico, Interseguro
 
-▸ PACIFICO ASISTE (header "@pacificoasiste.com.pe"):
-  - tipo_seguro = "PACIFICO"
-  - nombre_girador = valor de "Nombre Usuario:" (ej: "Frank Leon")
-  - taller_origen = valor de "Taller/Agencia:" (si tiene un código numérico como "20260413-1737000_01", buscar otro nombre en el documento; si no aparece, usar "Pacífico Asiste")
-  - numero_siniestro = valor de "Siniestro:"
-  - numero_orden = valor de "Caso:" o "Folio:"
-  - nombre_asegurado = valor de "Afectado:"
+B) Un TALLER que emite la orden → taller_origen = ese header
+   En este caso la aseguradora real está dentro del documento en campos como:
+   "Cia Seguro:", "Facturar a:", "Compañía:", "Aseguradora:"
+   Ejemplos vistos: "EA Corp SAC", "Qualität - Asesoría y Servicios"
 
-▸ QUALITÄT (header "Qualität - Asesoría y Servicios Empresariales"):
-  - Qualität ES UN TALLER, NO una aseguradora.
-  - tipo_seguro = leer "Facturar a:" al final del documento (suele decir "INTERSEGURO COMPAÑIA DE SEGUROS S.A" → tipo_seguro = "INTERSEGURO")
-  - nombre_girador = nombre que firma al final (ej: "AUTOLAND S.A.")
-  - taller_origen = "Qualität" (es el taller que recibe)
-  - numero_siniestro = valor de "Siniestro" (formato puede ser "69-009554")
-  - numero_orden = valor de "ORDEN DE TRABAJO No."
-  - nombre_asegurado = valor de "Asegurado"
+Si dudas: una aseguradora es identificable por su logo conocido y por estar 
+asociada al sector seguros. Una empresa con RUC y dirección que no encaja 
+con ninguna aseguradora conocida → es taller.
 
-═══════════════════════════════════════════════════════════
-PASO 2 - REGLAS GENERALES PARA EVITAR ERRORES
-═══════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════════
+EXTRACCIÓN DE CAMPOS
+═══════════════════════════════════════════════════════════════
 
-NO HACER NUNCA:
-- nombre_girador NUNCA es "REBIPLAST" ni el asegurado
-- taller_origen NUNCA es "REBIPLAST"
-- nombre_girador NUNCA es una empresa como "Pacífico Asiste" o "Mapfre Perú" — esos son emisores
-- Si dudas entre 2 personas: el girador es quien FIRMA o autoriza, NO el contacto del taller
+numero_siniestro: número que identifica el siniestro. Buscar en "Siniestro:", 
+"Siniestro N°", "DATOS DEL SINIESTRO". Puede tener formato variado:
+1013189, 100130126001462, 69-009554, 231151897, etc.
+Solo el número, NO descripciones como "Colision X Cta del Seguro".
 
-CAMPOS A EXTRAER:
-- placa: formato ABC123 o ABC1234 (puede tener guión: BYQ-727)
-- marca, modelo, color, anio
-- expediente, poliza, vin, telefono_asegurado, observaciones_orden
+numero_orden: número de orden de trabajo. Buscar en "NRO DE OC", "OC-", "OTR", 
+"Orden de Trabajo No.", "Folio:", "ORDEN DE TRABAJO Nro.". 
+NO confundir con NumOS (eso es otro campo).
 
-CANDIDATOS (lista todo lo visible aunque no estés 100% seguro):
-- candidatos.seguros: nombres de aseguradoras vistas
-- candidatos.giradores: nombres/empresas que podrían ser girador
-- candidatos.talleres: nombres de talleres (NUNCA REBIPLAST)
+placa: formato peruano. Letras + 3 números (ABC123) o 4 números (ABC1234).
+Puede tener guión: BYQ-727. Buscar en "Placa:".
 
-═══════════════════════════════════════════════════════════
-PASO 3 - PIEZAS (cada renglón = UNA pieza, NO agrupar)
-═══════════════════════════════════════════════════════════
+marca, modelo, color, anio: del vehículo. Buscar en "Marca:", "Modelo:", 
+"DATOS DEL VEHÍCULO".
 
-DÓNDE BUSCAR PIEZAS POR ASEGURADORA:
-- RIMAC: tabla "DETALLE DE APROBACIÓN" o lista numerada después de "REBIPLAST"
-- MAPFRE: tabla "DESCRIPCIÓN Y EVALUACIÓN DE DAÑOS", cada "REP xxx" en una sola celda son piezas SEPARADAS
-- LA POSITIVA: tabla "Cambio/Reparacion por" + columna "Descripción"
-- PACIFICO/EA Corp: tabla "OPERACION DESCRIPCION"
-- PACIFICO ASISTE: tabla "DESCRIPCIÓN" (líneas como "REP FUNDA POST")
-- QUALITÄT: piezas SOLO en "Observaciones" (ej: "OT POR REPUESTO: FUNDA POST SUP"). IGNORAR la tabla de montos (Planchado, Pintura, Terceros, etc.)
+datos_extra: expediente, poliza, vin, nombre_asegurado, telefono_asegurado, 
+observaciones_orden.
 
-REGLAS DE EXTRACCIÓN:
-- "REP" o "REPARAR" o "REPARACIÓN" → requiere_reparacion=true
-- "PINTURA" o "PINT" o "+ Pintura" → requiere_pintura=true
-- "PULIDO" → requiere_pulido=true
-- "FARO" o "NEBLINERO" → es_faro=true
-- "REP+PINTURA" o "RP" → ambas (reparacion + pintura)
+═══════════════════════════════════════════════════════════════
+CANDIDATOS (lista todo lo que veas, aunque no estés 100% seguro)
+═══════════════════════════════════════════════════════════════
+
+candidatos.seguros: nombres de aseguradoras que aparezcan visibles
+candidatos.giradores: personas o empresas que podrían ser girador
+candidatos.talleres: empresas/talleres visibles (NUNCA Rebiplast)
+
+Esto sirve para que la app pueda mostrar opciones al usuario si la 
+extracción principal no está clara.
+
+═══════════════════════════════════════════════════════════════
+EXTRACCIÓN DE PIEZAS
+═══════════════════════════════════════════════════════════════
+
+Cada pieza se identifica por una descripción de trabajo + ubicación.
+Cada renglón de descripción = UNA pieza separada (no agrupar).
+
+DÓNDE BUSCAR (varía por documento):
+- Tabla principal con columnas "DESCRIPCIÓN", "OPERACIÓN", "PIEZA", 
+  "Cambio/Reparación", "DETALLE DE APROBACIÓN"
+- Sección "Observaciones:" si hay piezas listadas allí
+- Líneas con códigos como "REP", "RP", "5A 2273T"
+
+CASOS ESPECIALES:
+- Si una celda contiene varias líneas con "REP xxx" cada una, son piezas SEPARADAS
+- Si el documento es Qualität u otra gestora, las piezas suelen estar SOLO 
+  en "Observaciones" (ej: "OT POR REPUESTO: FUNDA POST SUP"). 
+  IGNORAR la tabla de montos genéricos (Planchado, Pintura, Terceros, etc.)
+
+REGLAS PARA FLAGS:
+- "REP", "REPARAR", "REPARACIÓN" → requiere_reparacion = true
+- "PINTURA", "PINT", "+ Pintura" → requiere_pintura = true
+- "PULIDO" → requiere_pulido = true
+- "FARO", "NEBLINERO" → es_faro = true
+- "REP+PINTURA", "RP", "Reparación + Pintura" → ambas (reparación + pintura)
 
 LADOS:
-- "LH" o "IZQ" o "Izquierdo" → lado="LH"
-- "RH" o "DER" o "Derecho" → lado="RH"
-- "DEL" o "DELT" o "Delantero" o "Frontal" → lado="DELT"
-- "POST" o "Posterior" o "Trasero" → lado="POST"
-- Si no hay lado claro → lado="N/A"
+- "LH", "IZQ", "Izquierdo" → lado = "LH"
+- "RH", "DER", "Derecho" → lado = "RH"
+- "DEL", "DELT", "Delantero", "Frontal" → lado = "DELT"
+- "POST", "Posterior", "Trasero" → lado = "POST"
+- Sin lado claro → lado = "N/A"
 
-TIPO_TRABAJO (calcular después de los flags):
+TIPO_TRABAJO (calcular tras los flags):
 - Solo Reparación → "R"
 - Reparación + Pintura → "RP"
 - Reparación + Pintura + Pulido (faro) → "RPP"
 - Solo Pulido (faro sin cambio) → "PU"
 
 IGNORAR siempre:
-- SUBTOTAL, IGV, TOTAL, Precio, Monto
-- Categorías genéricas: "Planchado", "Pintura", "Mecánica", "Reparación", "Repuestos" cuando son COLUMNAS o ENCABEZADOS, no piezas
+- SUBTOTAL, IGV, TOTAL, Precio, Monto, Tipo de cambio
+- Categorías genéricas como columnas: "Planchado", "Pintura", "Mecánica", 
+  "Reparación", "Repuestos" cuando son ENCABEZADOS de tabla, no piezas reales
 
-═══════════════════════════════════════════════════════════
-ESTRUCTURA JSON DE RESPUESTA:
-═══════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════════
+ESTRUCTURA JSON DE RESPUESTA
+═══════════════════════════════════════════════════════════════
 
-{"numero_siniestro":null,"numero_orden":null,"marca":null,"placa":null,"color":null,"tipo_seguro":null,"nombre_girador":null,"taller_origen":null,"datos_extra":{"expediente":null,"poliza":null,"modelo":null,"anio":null,"vin":null,"nombre_asegurado":null,"telefono_asegurado":null,"observaciones_orden":null},"candidatos":{"seguros":[],"giradores":[],"talleres":[]},"piezas":[{"nombre":"","lado":"N/A","requiere_reparacion":false,"requiere_pintura":false,"es_faro":false,"requiere_pulido":false,"tipo_trabajo":null}]}`
+{
+  "numero_siniestro": null,
+  "numero_orden": null,
+  "marca": null,
+  "placa": null,
+  "color": null,
+  "tipo_seguro": null,
+  "nombre_girador": null,
+  "taller_origen": null,
+  "datos_extra": {
+    "expediente": null,
+    "poliza": null,
+    "modelo": null,
+    "anio": null,
+    "vin": null,
+    "nombre_asegurado": null,
+    "telefono_asegurado": null,
+    "observaciones_orden": null
+  },
+  "candidatos": {
+    "seguros": [],
+    "giradores": [],
+    "talleres": []
+  },
+  "piezas": [
+    {
+      "nombre": "",
+      "lado": "N/A",
+      "requiere_reparacion": false,
+      "requiere_pintura": false,
+      "es_faro": false,
+      "requiere_pulido": false,
+      "tipo_trabajo": null
+    }
+  ]
+}`
 
 function limpiarJSON(text: string): string {
   return text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
