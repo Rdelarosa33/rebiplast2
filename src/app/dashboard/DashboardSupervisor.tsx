@@ -27,25 +27,25 @@ export default async function DashboardSupervisor() {
   ] = await Promise.all([
     // Por recibir: en traslado
     supabase.from('piezas')
-      .select('*, siniestro:siniestros(numero_siniestro,placa,taller_origen)')
+      .select('*, siniestro:siniestros(numero_siniestro,numero_orden,placa,tipo_seguro,nombre_girador,taller_origen)')
       .eq('estado','EN_TRASLADO').order('created_at'),
     // Por asignar: recibidas O asignadas sin trabajador
     supabase.from('piezas')
-      .select('*, siniestro:siniestros(numero_siniestro,placa,taller_origen)')
+      .select('*, siniestro:siniestros(numero_siniestro,numero_orden,placa,tipo_seguro,nombre_girador,taller_origen)')
       .in('estado', ['RECIBIDO', 'ASIGNADO'])
       .is('trabajador_reparacion_id', null)
       .order('created_at'),
     // En control de calidad
     supabase.from('piezas')
-      .select('*, siniestro:siniestros(numero_siniestro,placa,taller_origen)')
+      .select('*, siniestro:siniestros(numero_siniestro,numero_orden,placa,tipo_seguro,nombre_girador,taller_origen)')
       .eq('estado','CONTROL_CALIDAD').order('updated_at', { ascending: false }),
     // Listas para entrega
     supabase.from('piezas')
-      .select('*, siniestro:siniestros(numero_siniestro,placa,taller_origen)')
+      .select('*, siniestro:siniestros(numero_siniestro,numero_orden,placa,tipo_seguro,nombre_girador,taller_origen)')
       .eq('estado','LISTO_ENTREGA').order('updated_at', { ascending: false }),
     // Siniestros con mezcla de asignados y sin asignar
     supabase.from('piezas')
-      .select('siniestro_id, estado, trabajador_reparacion_id, siniestro:siniestros(numero_siniestro,placa)')
+      .select('siniestro_id, estado, trabajador_reparacion_id, siniestro:siniestros(numero_siniestro,numero_orden,placa,tipo_seguro,nombre_girador,taller_origen)')
       .in('estado', ['RECIBIDO','ASIGNADO','EN_REPARACION','EN_PREPARACION','EN_PINTURA','EN_PULIDO']),
     // Trabajadores
     supabase.from('profiles')
@@ -58,7 +58,7 @@ export default async function DashboardSupervisor() {
       .eq('fecha', new Date().toISOString().split('T')[0]),
     // Carga laboral con detalle de piezas
     supabase.from('piezas')
-      .select('id, nombre, lado, estado, requiere_reparacion, requiere_pintura, requiere_pulido, trabajador_reparacion_id, siniestro:siniestros(numero_siniestro, placa)')
+      .select('id, nombre, lado, estado, requiere_reparacion, requiere_pintura, requiere_pulido, trabajador_reparacion_id, siniestro:siniestros(numero_siniestro,numero_orden,placa,tipo_seguro,nombre_girador,taller_origen)')
       .in('estado', ['ASIGNADO', 'EN_REPARACION', 'EN_PREPARACION', 'EN_PINTURA', 'EN_PULIDO', 'CONTROL_CALIDAD']),
   ])
 

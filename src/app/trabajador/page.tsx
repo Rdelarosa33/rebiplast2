@@ -14,7 +14,7 @@ export default async function TrabajadorPage() {
   // Piezas activas del trabajador
   const { data: piezasActivas } = await supabase
     .from('piezas')
-    .select('*, siniestro:siniestros(numero_siniestro, placa, tipo_seguro), historial:historial_piezas(accion, estado_nuevo, motivo, usuario_nombre, created_at)')
+    .select('*, siniestro:siniestros(numero_siniestro,numero_orden,placa,tipo_seguro,nombre_girador,taller_origen), historial:historial_piezas(accion, estado_nuevo, motivo, usuario_nombre, created_at)')
     .in('estado', ['ASIGNADO', 'EN_REPARACION', 'EN_PREPARACION', 'EN_PINTURA', 'EN_PULIDO'])
     .eq('trabajador_reparacion_id', profile.id)
     .order('updated_at', { ascending: false })
@@ -22,7 +22,7 @@ export default async function TrabajadorPage() {
   // Piezas terminadas (CONTROL_CALIDAD, LISTO_ENTREGA, ENTREGADO) por este trabajador
   const { data: piezasTerminadas } = await supabase
     .from('piezas')
-    .select('*, siniestro:siniestros(numero_siniestro, placa, tipo_seguro), historial:historial_piezas(accion, estado_nuevo, motivo, usuario_nombre, created_at)')
+    .select('*, siniestro:siniestros(numero_siniestro,numero_orden,placa,tipo_seguro,nombre_girador,taller_origen), historial:historial_piezas(accion, estado_nuevo, motivo, usuario_nombre, created_at)')
     .in('estado', ['CONTROL_CALIDAD', 'LISTO_ENTREGA', 'ENTREGADO'])
     .eq('trabajador_reparacion_id', profile.id)
     .order('updated_at', { ascending: false })

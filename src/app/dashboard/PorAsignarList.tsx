@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import AsignarPieza from './AsignarPieza'
+import InfoSiniestro from './InfoSiniestro'
 import { getTipoTrabajo, getTipoTrabajoDescripcion } from '@/types'
 
 interface Trabajador {
@@ -9,6 +10,15 @@ interface Trabajador {
   nombre: string
   apellido: string
   carga: number
+}
+
+interface SiniestroLite {
+  numero_siniestro: string
+  numero_orden?: string | null
+  placa: string
+  tipo_seguro?: string | null
+  nombre_girador?: string | null
+  taller_origen?: string | null
 }
 
 interface Pieza {
@@ -20,7 +30,7 @@ interface Pieza {
   requiere_pintura: boolean
   requiere_pulido: boolean
   es_faro?: boolean
-  siniestro: { numero_siniestro: string, placa: string }
+  siniestro: SiniestroLite
 }
 
 export default function PorAsignarList({ piezas, trabajadores }: { piezas: Pieza[], trabajadores: Trabajador[] }) {
@@ -72,7 +82,7 @@ export default function PorAsignarList({ piezas, trabajadores }: { piezas: Pieza
         return (
           <div key={p.id} className="p-3 bg-[#131920] rounded-xl space-y-2">
             <div className="flex items-center gap-3">
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 space-y-1">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-medium text-white truncate">{p.nombre}</p>
                   <span
@@ -81,13 +91,12 @@ export default function PorAsignarList({ piezas, trabajadores }: { piezas: Pieza
                   >
                     {tipo}
                   </span>
+                  {p.lado !== 'N/A' && (
+                    <span className="text-xs text-[#475569]">{p.lado}</span>
+                  )}
                 </div>
-                <p className="text-xs text-[#475569]">
-                  {p.lado !== 'N/A' ? `${p.lado} · ` : ''}
-                  <span className="font-mono text-[#00D4FF]">{p.siniestro?.numero_siniestro}</span>
-                  {' · '}{p.siniestro?.placa}
-                </p>
-                <div className="flex gap-1 mt-1">
+                <InfoSiniestro siniestro={p.siniestro} variant="compact" />
+                <div className="flex gap-1.5 mt-1">
                   {p.requiere_reparacion && <span className="text-xs text-amber-400">Rep</span>}
                   {p.requiere_pintura && <span className="text-xs text-pink-400">Pin</span>}
                   {p.requiere_pulido && <span className="text-xs text-rose-400">Pul</span>}

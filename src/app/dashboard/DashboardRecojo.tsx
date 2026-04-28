@@ -35,7 +35,7 @@ export default function DashboardRecojo() {
 
     // Piezas listas para entrega
     supabase.from('piezas')
-      .select('*, siniestro:siniestros(numero_siniestro, placa, taller_origen)')
+      .select('*, siniestro:siniestros(numero_siniestro,numero_orden,placa,tipo_seguro,nombre_girador,taller_origen)')
       .eq('estado', 'LISTO_ENTREGA')
       .order('updated_at', { ascending: false })
       .then(({ data }) => setListosEntrega(data || []))

@@ -145,8 +145,10 @@ export default function NuevoSiniestroPage() {
   const updatePieza = (i: number, field: keyof PiezaForm, value: any) => {
     const updated = [...piezas]
     updated[i] = { ...updated[i], [field]: value }
-    // Si marca es_faro, auto-marca pulido + pintura
-    if (field === 'es_faro' && value) { updated[i].requiere_pulido = true; updated[i].requiere_pintura = true }
+    // Si marca pintura, auto-marca reparación (pintura siempre requiere rep)
+    if (field === 'requiere_pintura' && value) { updated[i].requiere_reparacion = true }
+    // Si marca es_faro, auto-marca pulido + pintura (y por consecuencia reparación)
+    if (field === 'es_faro' && value) { updated[i].requiere_pulido = true; updated[i].requiere_pintura = true; updated[i].requiere_reparacion = true }
     // Si desmarca es_faro, auto-quita pulido (pulido solo aplica a faros)
     if (field === 'es_faro' && !value) { updated[i].requiere_pulido = false }
     // Recalcular tipo_trabajo desde los flags actuales

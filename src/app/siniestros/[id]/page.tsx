@@ -6,6 +6,7 @@ import { ArrowLeft, QrCode, Clock, CheckCircle, Printer } from 'lucide-react'
 import PiezaAcciones from './PiezaAcciones'
 import BotonQR from './BotonQR'
 import AsignarPiezaDetalle from './AsignarPiezaDetalle'
+import InfoSiniestro from '@/app/dashboard/InfoSiniestro'
 
 export default async function SiniestroDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -46,11 +47,13 @@ export default async function SiniestroDetailPage({ params }: { params: Promise<
         </div>
       </div>
 
+      <InfoSiniestro siniestro={siniestro} variant="card" />
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: 'Placa', value: siniestro.placa, mono: true },
           { label: 'Marca', value: siniestro.marca || '—' },
-          { label: 'Seguro', value: siniestro.tipo_seguro },
+          { label: 'Color', value: siniestro.color || '—' },
           { label: 'Fecha recojo', value: new Date(siniestro.fecha_recojo).toLocaleDateString('es-PE') },
         ].map(item => (
           <div key={item.label} className="card p-3">
@@ -75,16 +78,10 @@ export default async function SiniestroDetailPage({ params }: { params: Promise<
         </div>
       </div>
 
-      {(siniestro.nombre_asegurado || siniestro.nombre_girador || siniestro.observaciones) && (
+      {(siniestro.nombre_asegurado || siniestro.observaciones) && (
         <div className="card p-4 space-y-2">
           {siniestro.nombre_asegurado && (
             <div className="flex gap-3"><span className="text-xs text-[#475569] w-24">Asegurado</span><span className="text-sm text-white">{siniestro.nombre_asegurado}</span></div>
-          )}
-          {siniestro.nombre_girador && (
-            <div className="flex gap-3"><span className="text-xs text-[#475569] w-24">Girador</span><span className="text-sm text-white">{siniestro.nombre_girador}</span></div>
-          )}
-          {siniestro.numero_orden && (
-            <div className="flex gap-3"><span className="text-xs text-[#475569] w-24">N° Orden</span><span className="text-sm font-mono text-white">{siniestro.numero_orden}</span></div>
           )}
           {siniestro.observaciones && (
             <div className="flex gap-3"><span className="text-xs text-[#475569] w-24">Obs.</span><span className="text-sm text-[#94A3B8]">{siniestro.observaciones}</span></div>

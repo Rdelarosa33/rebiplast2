@@ -12,7 +12,7 @@ export default async function DashboardTrabajadorInicio({ profile }: { profile: 
 
   const { data: piezas } = await supabase
     .from('piezas')
-    .select('*, siniestro:siniestros(numero_siniestro, placa, tipo_seguro)')
+    .select('*, siniestro:siniestros(numero_siniestro,numero_orden,placa,tipo_seguro,nombre_girador,taller_origen)')
     .in('estado', estados)
     .order('updated_at', { ascending: false })
 

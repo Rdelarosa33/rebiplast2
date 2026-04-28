@@ -7,6 +7,7 @@ import { cambiarEstadoPieza } from '@/lib/actions'
 import { Pieza, Profile, ESTADO_LABELS, ESTADO_COLOR, ROLE_LABELS, getAcciones, Accion } from '@/types'
 import { ArrowLeft, CheckCircle, AlertCircle, User, QrCode, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
+import InfoSiniestro from '@/app/dashboard/InfoSiniestro'
 
 export default function ScanPiezaPage({ params }: { params: { id: string } }) {
   const router = useRouter()
@@ -107,21 +108,8 @@ export default function ScanPiezaPage({ params }: { params: { id: string } }) {
 
       {/* Siniestro */}
       {pieza.siniestro && (
-        <Link href={`/siniestros/${pieza.siniestro_id}`} className="card p-4 block hover:border-[#00D4FF]/30 transition-colors">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-[#475569]">Siniestro</p>
-              <p className="text-sm font-mono font-semibold text-[#00D4FF]">{(pieza.siniestro as any).numero_siniestro}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-[#475569]">Placa</p>
-              <p className="text-sm font-mono text-white">{(pieza.siniestro as any).placa}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-[#475569]">Taller</p>
-              <p className="text-xs text-[#94A3B8] max-w-[100px] text-right truncate">{(pieza.siniestro as any).taller_origen}</p>
-            </div>
-          </div>
+        <Link href={`/siniestros/${pieza.siniestro_id}`} className="block hover:opacity-90 transition-opacity">
+          <InfoSiniestro siniestro={pieza.siniestro as any} variant="card" />
         </Link>
       )}
 

@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { ESTADO_COLOR, ESTADO_LABELS, PiezaEstado } from '@/types'
 import { Plus } from 'lucide-react'
+import InfoSiniestro from '@/app/dashboard/InfoSiniestro'
 
 const SEGUROS = ['RIMAC','PACIFICO','MAPFRE','LA_POSITIVA','HDI','INTERSEGURO','TALLER']
 
@@ -137,17 +138,12 @@ export default async function SiniestrosPage({ searchParams }: { searchParams: P
             <Link key={s.id} href={`/siniestros/${s.id}`}
               className="card p-4 block hover:border-[#00D4FF]/30 transition-colors">
               <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 space-y-1.5">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono text-sm font-semibold text-[#00D4FF]">{s.numero_siniestro}</span>
-                    <span className="text-xs text-[#475569]">•</span>
                     <span className="font-mono text-sm text-white">{s.placa}</span>
-                    {s.marca && <span className="text-xs text-[#475569]">{s.marca}</span>}
-                    <span className="text-xs bg-[#131920] border border-[#1E2D42] text-[#94A3B8] px-2 py-0.5 rounded-full">
-                      {s.tipo_seguro}
-                    </span>
+                    {s.marca && <span className="text-xs text-[#475569]">{s.marca} {s.modelo || ''}</span>}
                   </div>
-                  <p className="text-xs text-[#475569] mt-1 truncate">{s.taller_origen}</p>
+                  <InfoSiniestro siniestro={s} variant="inline" />
                   <div className="flex flex-wrap gap-1 mt-2">
                     {estadosUnicos.slice(0, 4).map(e => (
                       <span key={e} className={`badge ${ESTADO_COLOR[e]}`}>{ESTADO_LABELS[e]}</span>

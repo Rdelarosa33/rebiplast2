@@ -86,8 +86,9 @@ export default function ImprimirEtiquetasPage() {
             {/* Separador */}
             <div className="separador" />
             {/* Datos siniestro */}
-            <p className="dato"><strong>{siniestro.numero_siniestro}</strong> · {siniestro.numero_orden || ''}</p>
+            <p className="dato"><strong>{siniestro.numero_siniestro}</strong> · {siniestro.numero_orden || '—'}</p>
             <p className="dato">{siniestro.placa} · {siniestro.tipo_seguro}</p>
+            {siniestro.nombre_girador && <p className="dato">{siniestro.nombre_girador}</p>}
             <p className="dato taller">{siniestro.taller_origen}</p>
             <p className="num">{i + 1}/{siniestro.piezas.length}</p>
           </div>

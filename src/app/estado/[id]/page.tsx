@@ -15,8 +15,8 @@ export default async function EstadoPublicoPage({ params }: { params: Promise<{ 
   const { data: siniestro } = await supabase
     .from('siniestros')
     .select(`
-      id, numero_siniestro, placa, marca, modelo, anio, color,
-      tipo_seguro, taller_origen, fecha_recojo, fecha_entrega_estimada,
+      id, numero_siniestro, numero_orden, placa, marca, modelo, anio, color,
+      tipo_seguro, nombre_girador, taller_origen, fecha_recojo, fecha_entrega_estimada,
       piezas (
         id, nombre, lado, color,
         requiere_reparacion, requiere_pintura, requiere_pulido, es_faro,
@@ -101,7 +101,19 @@ export default async function EstadoPublicoPage({ params }: { params: Promise<{ 
             </div>
             <div style={{ textAlign: 'right' }}>
               <p style={{ color: '#64748b', fontSize: 11, margin: '0 0 2px' }}>Taller</p>
-              <p style={{ color: '#0f172a', fontSize: 13, fontWeight: 600, margin: '0 0 8px' }}>{siniestro.taller_origen}</p>
+              <p style={{ color: '#0f172a', fontSize: 13, fontWeight: 600, margin: '0 0 8px' }}>{siniestro.taller_origen || '—'}</p>
+              {siniestro.nombre_girador && (
+                <>
+                  <p style={{ color: '#64748b', fontSize: 11, margin: '0 0 2px' }}>Girador</p>
+                  <p style={{ color: '#0f172a', fontSize: 13, fontWeight: 600, margin: '0 0 8px' }}>{siniestro.nombre_girador}</p>
+                </>
+              )}
+              {siniestro.numero_orden && (
+                <>
+                  <p style={{ color: '#64748b', fontSize: 11, margin: '0 0 2px' }}>N° Orden</p>
+                  <p style={{ color: '#0f172a', fontSize: 13, fontWeight: 600, margin: '0 0 8px', fontFamily: 'monospace' }}>{siniestro.numero_orden}</p>
+                </>
+              )}
               <p style={{ color: '#64748b', fontSize: 11, margin: '0 0 2px' }}>Ingreso</p>
               <p style={{ color: '#0f172a', fontSize: 13, margin: 0 }}>
                 {new Date(siniestro.fecha_recojo).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' })}

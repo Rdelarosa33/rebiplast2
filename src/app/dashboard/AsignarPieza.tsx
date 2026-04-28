@@ -67,9 +67,11 @@ export default function AsignarPieza({
     setErrorFlags('')
   }
 
-  // Lógica auxiliar: si desmarcas faro, también desmarca pulido
+  // Lógica auxiliar: auto-correcciones de consistencia
   const setFlag = (campo: keyof FlagsIniciales, valor: boolean) => {
     const nuevos = { ...flags, [campo]: valor }
+    // Si marca pintura, auto-marca reparación (pintura siempre requiere rep)
+    if (campo === 'requiere_pintura' && valor) nuevos.requiere_reparacion = true
     // Si desmarca es_faro, también quita pulido
     if (campo === 'es_faro' && !valor) nuevos.requiere_pulido = false
     // Si marca pulido sin ser faro, marca faro automáticamente

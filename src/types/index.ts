@@ -344,10 +344,5 @@ export function validarFlagsPieza(flags: FlagsPieza): string | null {
     return 'El pulido solo aplica a faros'
   }
 
-  // Pintura sin reparación no aplica (excepto si es solo pulido)
-  if (requiere_pintura && !requiere_reparacion) {
-    return 'La pintura requiere reparación'
-  }
-
   return null
 }
