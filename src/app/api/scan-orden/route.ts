@@ -90,10 +90,10 @@ function matchConLista(candidatos: string[], registros: any[], campoNombre: stri
       if (candNorm.includes(nombreNorm) || nombreNorm.includes(candNorm)) return { nombre, fuente: 'tabla_parcial' }
       if (alias.some(a => candNorm.includes(a) || a.includes(candNorm))) return { nombre, fuente: 'tabla_alias' }
 
-      const palabrasNombre = nombreNorm.split(' ').filter(p => p.length > 3)
-      const palabrasCand = candNorm.split(' ').filter(p => p.length > 3)
+      const palabrasNombre = nombreNorm.split(' ').filter(p => p.length > 2)
+      const palabrasCand = candNorm.split(' ').filter(p => p.length > 2)
       const matches = palabrasNombre.filter(p => palabrasCand.includes(p))
-      if (matches.length >= Math.min(2, palabrasNombre.length)) return { nombre, fuente: 'tabla_palabras' }
+      if (matches.length >= Math.min(1, palabrasNombre.length)) return { nombre, fuente: 'tabla_palabras' }
     }
   }
 
@@ -105,10 +105,10 @@ function matchConLista(candidatos: string[], registros: any[], campoNombre: stri
 // ============================================================
 const PROMPT = `Lee esta orden de trabajo automotriz peruana. Devuelve SOLO JSON válido.
 
-CAMPOS: numero_siniestro(Siniestro/Caso), numero_orden(NRO DE OC/NumOS/N°/OC-/Folio), marca, placa(ABC123 o ABC1234), color
+CAMPOS: numero_siniestro(campo Siniestro/Caso/SINIESTRO - solo el numero, NO descripcion), numero_orden(campo NRO DE OC/OTR.../OC-/Folio/ORDEN DE TRABAJO Nro. - NO usar NumOS para orden), marca, placa(ABC123 o ABC1234), color
 tipo_seguro: RIMAC/MAPFRE/PACIFICO/LA_POSITIVA/HDI/INTERSEGURO/TALLER/OTRO
 nombre_girador: nombre junto a Tecnico/Perito/Asesor/Realizado por/VoBo/firma
-taller_origen: extraer el VALOR (no el label) de: Cliente > TALLER PRINCIPAL > ATENCION A TALLER > "a los señores" > firma empresa. NUNCA usar: REBIPLAST.
+taller_origen: extraer el VALOR (no el label) de: TALLER PRINCIPAL > ATENCION A TALLER > encabezado empresa (ej: EA Corp SAC) > "a los señores" > firma empresa. NUNCA usar: REBIPLAST.
 datos_extra: expediente, poliza, modelo, anio, vin, nombre_asegurado, telefono_asegurado, observaciones_orden
 
 CANDIDATOS (todo lo que veas aunque no estés seguro):
@@ -178,10 +178,18 @@ export async function POST(request: NextRequest) {
     const data = JSON.parse(jsonText)
     const candidatos = data.candidatos || { seguros: [], giradores: [], talleres: [] }
 
-    // ── PASO 2: Extraer monto con regex del texto completo ──
-    const textoCompleto = data.texto_completo || ''
-    const { monto_total, moneda } = extraerMonto(textoCompleto)
-    debugLog.push({ campo: 'monto', texto_buscado: textoCompleto.slice(0, 200), monto_total, moneda })
+    // ── PASO 2: Extraer monto con regex de todos los campos de texto ──
+    const textoParaMonto = [
+      data.texto_completo,
+      data.taller_origen,
+      data.observaciones,
+      data.datos_extra?.observaciones_orden,
+      ...(data.piezas || []).map((p: any) => p.nombre)
+    ].filter(Boolean).join(' ')
+    // Intentar con texto de GPT, si falla buscar en JSON completo
+    const jsonStr = JSON.stringify(data)
+    const { monto_total, moneda } = extraerMonto(textoParaMonto) || extraerMonto(jsonStr)
+    debugLog.push({ campo: 'monto', texto_buscado: textoParaMonto.slice(0, 200), monto_total, moneda })
 
     // ── PASO 3: Cargar tablas de referencia ──
     const [{ data: refAseg }, { data: refGir }, { data: refTall }] = await Promise.all([
@@ -201,7 +209,13 @@ export async function POST(request: NextRequest) {
     debugLog.push({ campo: 'girador', detectado: data.nombre_girador, candidatos: candidatos.giradores, match: girMatch.nombre, fuente: girMatch.fuente })
 
     // ── PASO 6: Match taller ──
-    const tallCandidatos = [...(candidatos.talleres || []), data.taller_origen].filter(Boolean).filter(t => !estaProhibido(t))
+    // Si la imagen tiene EA Corp en el encabezado, agregarlo como candidato prioritario
+    const eaCorpCandidato = (data.texto_completo || '').toUpperCase().includes('EA CORP') ? 'EA Corp SAC' : null
+    const tallCandidatos = [
+      eaCorpCandidato,
+      ...(candidatos.talleres || []),
+      data.taller_origen
+    ].filter(Boolean).filter((t: string) => !estaProhibido(t))
     const tallMatch = matchConLista(tallCandidatos, refTall || [], 'nombre')
     debugLog.push({ campo: 'taller', detectado: data.taller_origen, candidatos: candidatos.talleres, match: tallMatch.nombre, fuente: tallMatch.fuente })
 
