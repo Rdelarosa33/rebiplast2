@@ -41,6 +41,10 @@ export default function NuevoSiniestroPage() {
   const [advertenciaCalidad, setAdvertenciaCalidad] = useState<{ problemas: string[]; archivo: File } | null>(null)
   const [tipoSeleccionado, setTipoSeleccionado] = useState<'RIMAC' | 'MAPFRE' | 'PACIFICO' | 'LA_POSITIVA' | 'INTERSEGURO' | 'TALLER' | null>(null)
   const [alertaTipoMismatch, setAlertaTipoMismatch] = useState<string | null>(null)
+  // Autocomplete de talleres desde BD
+  const [sugerenciasTaller, setSugerenciasTaller] = useState<string[]>([])
+  const [mostrarSugerenciasTaller, setMostrarSugerenciasTaller] = useState(false)
+  const [tallerBuscando, setTallerBuscando] = useState(false)
   const [candidatos, setCandidatos] = useState<{
     seguros: string[];
     entidades: string[];
@@ -576,7 +580,62 @@ export default function NuevoSiniestroPage() {
                     : <span className="text-[9px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded">REVISAR</span>
                   )}
                 </label>
-                <input className="input-field" value={form.taller_origen} onChange={e => setForm({...form, taller_origen: e.target.value})} placeholder="Ej: Maquinarias SM" />
+                <div className="relative">
+                  <input
+                    className="input-field"
+                    value={form.taller_origen}
+                    placeholder="Ej: Maquinarias SM"
+                    onChange={async (e) => {
+                      const v = e.target.value
+                      setForm({...form, taller_origen: v})
+                      if (v.length >= 2) {
+                        setTallerBuscando(true)
+                        setMostrarSugerenciasTaller(true)
+                        try {
+                          const res = await fetch(`/api/buscar-talleres?q=${encodeURIComponent(v)}`)
+                          const data = await res.json()
+                          setSugerenciasTaller(data.talleres || [])
+                        } catch {
+                          setSugerenciasTaller([])
+                        }
+                        setTallerBuscando(false)
+                      } else {
+                        setSugerenciasTaller([])
+                        setMostrarSugerenciasTaller(false)
+                      }
+                    }}
+                    onFocus={() => {
+                      if (sugerenciasTaller.length > 0) setMostrarSugerenciasTaller(true)
+                    }}
+                    onBlur={() => {
+                      // Delay para que el click en sugerencia funcione
+                      setTimeout(() => setMostrarSugerenciasTaller(false), 150)
+                    }}
+                  />
+                  {mostrarSugerenciasTaller && (sugerenciasTaller.length > 0 || tallerBuscando) && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-[#0D1117] border border-[#1E2D42] rounded-xl shadow-2xl z-30 max-h-56 overflow-y-auto">
+                      {tallerBuscando && (
+                        <div className="px-3 py-2 text-xs text-[#475569]">Buscando...</div>
+                      )}
+                      {!tallerBuscando && sugerenciasTaller.length === 0 && (
+                        <div className="px-3 py-2 text-xs text-[#475569]">Sin coincidencias en BD</div>
+                      )}
+                      {sugerenciasTaller.map((s, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => {
+                            setForm({...form, taller_origen: s})
+                            setMostrarSugerenciasTaller(false)
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs text-[#94A3B8] hover:bg-[#131920] hover:text-[#00D4FF] border-b border-[#1E2D42] last:border-b-0"
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 {candidatos.candidatos_taller.length > 0 && (
                   <div className="mt-2">
                     <p className="text-[9px] text-[#475569] mb-1">Detectados en la orden (click para usar):</p>

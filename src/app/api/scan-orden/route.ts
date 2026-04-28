@@ -81,80 +81,6 @@ function extraerMonto(texto: string): { monto_total: number | null, moneda: stri
 }
 
 // ============================================================
-// MATCH INTELIGENTE
-// ============================================================
-type FuenteMatch = 'tabla_exacta' | 'tabla_alias' | 'tabla_parcial' | 'tabla_palabras' | 'gpt' | null
-type MatchResult = { nombre: string; fuente: FuenteMatch }
-
-function matchConLista(candidatos: string[], registros: any[], campoNombre: string): MatchResult {
-  if (!candidatos?.length || !registros?.length) return { nombre: '', fuente: null }
-
-  const cands = [...candidatos].sort((a, b) => b.length - a.length)
-
-  // ─── PASADA 1: solo coincidencias EXACTAS en todos los registros ───
-  // Esto previene que un match parcial gane sobre uno exacto que existe más adelante en la lista
-  for (const cand of cands) {
-    if (!cand || estaProhibido(cand)) continue
-    const candNorm = normalizar(cand)
-
-    for (const reg of registros) {
-      const nombre = reg[campoNombre] || ''
-      const nombreNorm = normalizar(nombre)
-      const alias: string[] = (reg.alias || []).map((a: string) => normalizar(a))
-
-      // Exacto nombre oficial
-      if (candNorm === nombreNorm) return { nombre, fuente: 'tabla_exacta' }
-
-      // Exacto en alias
-      if (alias.some(a => candNorm === a)) return { nombre, fuente: 'tabla_alias' }
-    }
-  }
-
-  // ─── PASADA 2: coincidencias parciales (más laxo) ───
-  for (const cand of cands) {
-    if (!cand || estaProhibido(cand)) continue
-    const candNorm = normalizar(cand)
-    const palabrasCand = candNorm.split(' ').filter(p => p.length > 2)
-
-    const regs = [...registros].sort((a, b) =>
-      (b[campoNombre]?.length || 0) - (a[campoNombre]?.length || 0)
-    )
-
-    for (const reg of regs) {
-      const nombre = reg[campoNombre] || ''
-      const nombreNorm = normalizar(nombre)
-      const alias: string[] = (reg.alias || []).map((a: string) => normalizar(a))
-
-      // Parcial nombre oficial - requiere que UNO contenga al OTRO COMPLETO
-      // Ej: "TOYO SERVICE SA" contiene "TOYO SERVICE" ✓ pero "PANA SM TOYO SM" NO contiene "TOYO SERVICE" ✗
-      if (candNorm.length >= 4 && nombreNorm.length >= 4) {
-        if (candNorm.includes(nombreNorm) || nombreNorm.includes(candNorm)) {
-          return { nombre, fuente: 'tabla_parcial' }
-        }
-      }
-
-      // Parcial en alias
-      if (alias.some(a => a.length >= 4 && (candNorm.includes(a) || a.includes(candNorm)))) {
-        return { nombre, fuente: 'tabla_alias' }
-      }
-
-      // Por palabras - MUY ESTRICTO ahora:
-      // Requiere que TODAS las palabras del candidato estén presentes en el registro
-      // Y que sean al menos 2 palabras (palabras únicas no califican)
-      const palabrasNombre = nombreNorm.split(' ').filter(p => p.length > 2)
-      if (palabrasCand.length >= 2 && palabrasNombre.length >= 2) {
-        const todasMatch = palabrasCand.every(p => palabrasNombre.includes(p))
-        if (todasMatch) {
-          return { nombre, fuente: 'tabla_palabras' }
-        }
-      }
-    }
-  }
-
-  return { nombre: '', fuente: null }
-}
-
-// ============================================================
 // PROMPT
 // ============================================================
 const PROMPT = `Eres un sistema de extracción de datos de órdenes de trabajo automotrices peruanas.
@@ -637,64 +563,20 @@ export async function POST(request: NextRequest) {
     }
     debugLog.push({ campo: 'monto', monto_total, moneda, fuente: data.monto_total != null ? 'gpt' : 'regex' })
 
-    // ── PASO 4: Cargar tablas de referencia ──
-    // Selects defensivos: si la columna 'alias' no existe (versión vieja del schema),
-    // hacer fallback a select sin alias para no perder los demás campos
-    const cargarRef = async (tabla: string, columnasConAlias: string, columnasSinAlias: string): Promise<any[]> => {
-      const { data, error } = await supabase.from(tabla).select(columnasConAlias)
-      if (error || !data) {
-        // Fallback sin alias
-        const { data: data2 } = await supabase.from(tabla).select(columnasSinAlias)
-        return (data2 as any[]) || []
-      }
-      return data as any[]
-    }
+    // ── PASO 4: Validar tipo_seguro y construir lista de entidades ──
+    // (ELIMINADO el matching contra BD. La BD ahora se consulta solo por autocomplete
+    //  cuando el usuario escribe en el campo Taller. Ver /api/buscar-talleres.)
 
-    const [refAseg, refGir, refTall] = await Promise.all([
-      cargarRef('ref_aseguradoras', 'variante, tipo, alias', 'variante, tipo'),
-      cargarRef('ref_giradores',    'nombre, aseguradora, alias', 'nombre, aseguradora'),
-      cargarRef('ref_talleres',     'nombre, alias', 'nombre'),
-    ])
-
-    debugLog.push({
-      campo: 'tablas_cargadas',
-      aseguradoras: refAseg.length,
-      giradores: refGir.length,
-      talleres: refTall.length,
-    })
-
-    // ── PASO 5: Match seguro ──
-    const segCandidatos = [...(candidatos.seguros || []), data.tipo_seguro].filter(Boolean)
-    const segMatch = matchConLista(segCandidatos, refAseg || [], 'variante')
-    debugLog.push({ campo: 'seguro', detectado: data.tipo_seguro, candidatos: candidatos.seguros, match: segMatch.nombre, fuente: segMatch.fuente })
-
-    // Entidades unificadas: GPT ahora devuelve TODOS los nombres de personas y empresas
-    // Si vino el formato viejo (giradores/talleres separados), los combinamos
-    const entidadesUnif = candidatos.entidades || [
+    // Entidades unificadas (lo que GPT vio en la imagen, filtrado de prohibidos)
+    const entidadesGPT: string[] = candidatos.entidades || [
       ...(candidatos.giradores || []),
       ...(candidatos.talleres || []),
     ]
+    const entidadesFiltradas = entidadesGPT.filter((e: string) => !estaProhibido(e))
 
-    // ── PASO 6: Match girador (busca en entidades unificadas + lo detectado) ──
-    const girCandidatos = [...entidadesUnif, data.nombre_girador].filter(Boolean)
-    const girMatch = matchConLista(girCandidatos, refGir || [], 'nombre')
-    debugLog.push({ campo: 'girador', detectado: data.nombre_girador, candidatos: entidadesUnif, match: girMatch.nombre, fuente: girMatch.fuente })
-
-    // ── PASO 7: Match taller (busca en entidades unificadas + lo detectado) ──
-    const tallCandidatos = [...entidadesUnif, data.taller_origen]
-      .filter(Boolean)
-      .filter((t: string) => !estaProhibido(t))
-    const tallMatch = matchConLista(tallCandidatos, refTall || [], 'nombre')
-    debugLog.push({ campo: 'taller', detectado: data.taller_origen, candidatos: entidadesUnif, match: tallMatch.nombre, fuente: tallMatch.fuente })
-
-    // ── PASO 8: tipo_seguro - el usuario MANDA, no se sobrescribe ──
-    // El usuario ya eligió el tipo antes de subir la foto.
-    // Solo cambiamos si: usuario eligió TALLER y GPT detectó una aseguradora real
-    // (en cuyo caso tomamos lo que GPT detectó).
+    // ── PASO 5: tipo_seguro - el usuario MANDA ──
     let tipoSeguroFinal: string = tipoSeleccionado
-
     if (tipoSeleccionado === 'TALLER') {
-      // Usuario no sabía qué era, dejamos que GPT decida
       const detectado = (data.tipo_seguro_detectado || '').toUpperCase().trim()
       if (detectado && detectado !== 'TALLER' &&
           ['RIMAC', 'MAPFRE', 'PACIFICO', 'LA_POSITIVA', 'INTERSEGURO'].includes(detectado)) {
@@ -702,10 +584,83 @@ export async function POST(request: NextRequest) {
         debugLog.push({ campo: 'seguro_inferido', desde: 'gpt_detectado', valor: tipoSeguroFinal })
       }
     }
-    // Si usuario eligió una aseguradora específica (RIMAC, MAPFRE, etc.) → mantener su elección
-    // Esto evita que el sistema "infiera" otra aseguradora desde el girador o BD
 
-    // ── PASO 9: Construir observaciones concatenadas ──
+    // ── PASO 6: Validar girador y taller (sin matching BD) ──
+    // - Si GPT dejó null → null (no inventar)
+    // - Si lo detectado es prohibido (Rebiplast/Rafael) → null
+    // - Si el girador es el asegurado → null
+    const validarValor = (gptValor: string | null, comparaCon: string | null = null): string | null => {
+      if (!gptValor) return null
+      if (estaProhibido(gptValor)) return null
+      if (comparaCon && normalizar(gptValor) === normalizar(comparaCon)) return null
+      return gptValor
+    }
+
+    const nombreAsegurado = data.datos_extra?.nombre_asegurado || ''
+    const giradorFinal = validarValor(data.nombre_girador, nombreAsegurado)
+    const tallerFinal = validarValor(data.taller_origen)
+
+    debugLog.push({ campo: 'girador', detectado: data.nombre_girador, final: giradorFinal })
+    debugLog.push({ campo: 'taller', detectado: data.taller_origen, final: tallerFinal })
+
+    // LOG silencioso de violaciones del prompt (Rebiplast/Rafael en respuesta GPT)
+    const violaciones: string[] = []
+    if (estaProhibido(data.nombre_girador || '')) violaciones.push(`girador: ${data.nombre_girador}`)
+    if (estaProhibido(data.taller_origen || '')) violaciones.push(`taller: ${data.taller_origen}`)
+    for (const ent of (entidadesGPT || [])) {
+      if (estaProhibido(ent)) {
+        violaciones.push(`entidad: ${ent}`)
+        break
+      }
+    }
+    if (violaciones.length > 0) {
+      debugLog.push({ campo: 'prompt_violacion', detalles: violaciones })
+    }
+
+    // ── PASO 7: Construir candidatos para UI (solo lo que GPT vio) ──
+    // Filtrar el nombre del asegurado y el de Rebiplast/Rafael de las entidades
+    const filtrarNombre = (lista: string[], nombre: string): string[] => {
+      if (!nombre) return lista
+      const norm = normalizar(nombre)
+      const palabras = norm.split(' ').filter(p => p.length > 2)
+      return lista.filter((e: string) => {
+        const eN = normalizar(e)
+        if (eN === norm) return false
+        const palabrasE = eN.split(' ').filter(p => p.length > 2)
+        if (palabrasE.length > 0 && palabrasE.every(p => palabras.includes(p))) return false
+        return true
+      })
+    }
+
+    let entidadesParaGirador = filtrarNombre(entidadesFiltradas, nombreAsegurado)
+    if (tallerFinal) entidadesParaGirador = filtrarNombre(entidadesParaGirador, tallerFinal)
+
+    let entidadesParaTaller = filtrarNombre(entidadesFiltradas, nombreAsegurado)
+    if (giradorFinal) entidadesParaTaller = filtrarNombre(entidadesParaTaller, giradorFinal)
+
+    // Lista de candidatos: principal primero (lo que GPT detectó), luego otras entidades
+    const armarLista = (principal: string | null, otras: string[]): string[] => {
+      const lista: string[] = []
+      const seen = new Set<string>()
+      if (principal && !estaProhibido(principal)) {
+        lista.push(principal)
+        seen.add(normalizar(principal))
+      }
+      for (const e of otras) {
+        if (!e || estaProhibido(e)) continue
+        const n = normalizar(e)
+        if (seen.has(n)) continue
+        lista.push(e)
+        seen.add(n)
+      }
+      return lista
+    }
+
+    const candidatosGirador = armarLista(giradorFinal, entidadesParaGirador)
+    const candidatosTaller = armarLista(tallerFinal, entidadesParaTaller)
+    const entidadesCombinadas = [...new Set([...candidatosGirador, ...candidatosTaller])]
+
+    // ── PASO 8: Observaciones ──
     const extra = data.datos_extra || {}
     const partsObs: string[] = []
     if (extra.expediente) partsObs.push(`Expediente: ${extra.expediente}`)
@@ -718,7 +673,7 @@ export async function POST(request: NextRequest) {
     if (extra.observaciones_orden) partsObs.push(`Obs: ${extra.observaciones_orden}`)
     const observaciones = partsObs.length > 0 ? partsObs.join(' | ') : null
 
-    // ── PASO 9.5: Sanear piezas (GPT a veces devuelve strings en lugar de booleanos) ──
+    // ── PASO 9: Sanear piezas ──
     const toBool = (v: any): boolean => {
       if (typeof v === 'boolean') return v
       if (typeof v === 'string') {
@@ -732,7 +687,6 @@ export async function POST(request: NextRequest) {
       const requiere_pintura = toBool(p.requiere_pintura)
       const es_faro = toBool(p.es_faro)
       const requiere_pulido = toBool(p.requiere_pulido)
-      // Recalcular tipo_trabajo desde flags saneados (consistencia)
       let tipo_trabajo = 'R'
       if (!requiere_reparacion && !requiere_pintura && requiere_pulido) tipo_trabajo = 'PU'
       else if (requiere_reparacion && requiere_pintura && requiere_pulido) tipo_trabajo = 'RPP'
@@ -747,166 +701,34 @@ export async function POST(request: NextRequest) {
         requiere_pulido,
         tipo_trabajo,
         precio: p.precio || null,
-        monto: p.monto != null ? Number(p.monto) : null,  // Monto por pieza
+        monto: p.monto != null ? Number(p.monto) : null,
         observaciones: p.observaciones || null,
       }
     })
 
-    // ── PASO 10: Construir resultado final ──
-    // Estrategia para taller y girador:
-    // - Si GPT dejó NULL → respetar (no inventar con BD)
-    // - Si GPT detectó algo → usar GPT como principal (no permitir que BD lo pise)
-    // - BD solo gana si el match es EXACTO con lo que GPT detectó
-    // - Los matches BD parciales se ofrecen como SUGERENCIAS al usuario, no se imponen
-
-    const elegirPrincipal = (matchNombre: string, matchFuente: any, gptValor: string | null): string | null => {
-      // Si GPT no detectó nada → null (NO inventar con BD)
-      if (!gptValor) return null
-
-      // Si lo detectado es prohibido (Rebiplast/Rafael) → null
-      if (estaProhibido(gptValor)) return null
-
-      // Si match es exacto Y coincide con lo de GPT → usar BD (caso ideal de normalización)
-      if ((matchFuente === 'tabla_exacta' || matchFuente === 'tabla_alias') &&
-          matchNombre && !estaProhibido(matchNombre)) {
-        return matchNombre
-      }
-
-      // Default: lo que GPT vio en la imagen
-      return gptValor
-    }
-
-    const tallerFinal = elegirPrincipal(tallMatch.nombre, tallMatch.fuente, data.taller_origen)
-    const giradorFinal = elegirPrincipal(girMatch.nombre, girMatch.fuente, data.nombre_girador)
-
-    // Construir lista enriquecida de candidatos:
-    // 1) GPT detectó (principal) + 2) Otras entidades vistas + 3) Matches BD relacionados
-    const construirCandidatos = (
-      principal: string | null,
-      entidades: string[],
-      matchBD: string | null
-    ): string[] => {
-      const lista: string[] = []
-      const seen = new Set<string>()
-
-      // 1) Principal primero (lo que GPT detectó)
-      if (principal && !estaProhibido(principal)) {
-        const norm = normalizar(principal)
-        if (!seen.has(norm)) {
-          lista.push(principal)
-          seen.add(norm)
-        }
-      }
-
-      // 2) Otras entidades vistas en la orden
-      for (const e of entidades) {
-        if (!e || estaProhibido(e)) continue
-        const norm = normalizar(e)
-        if (seen.has(norm)) continue
-        lista.push(e)
-        seen.add(norm)
-      }
-
-      // 3) Match BD (si hay y es distinto al principal)
-      if (matchBD && !estaProhibido(matchBD)) {
-        const norm = normalizar(matchBD)
-        if (!seen.has(norm)) {
-          lista.push(matchBD)
-          seen.add(norm)
-        }
-      }
-
-      return lista
-    }
-
-    // Filtrar entidades para quitar prohibidos
-    const entidadesFiltradas = entidadesUnif.filter((e: string) => !estaProhibido(e))
-
-    // LOG SILENCIOSO: detectar si GPT intentó poner Rebiplast/Rafael (violación del prompt)
-    const violaciones: string[] = []
-    if (estaProhibido(data.nombre_girador || '')) {
-      violaciones.push(`girador: ${data.nombre_girador}`)
-    }
-    if (estaProhibido(data.taller_origen || '')) {
-      violaciones.push(`taller: ${data.taller_origen}`)
-    }
-    for (const ent of (candidatos.entidades || [])) {
-      if (estaProhibido(ent)) {
-        violaciones.push(`entidad: ${ent}`)
-        break  // Solo loguear una vez para no saturar
-      }
-    }
-    if (violaciones.length > 0) {
-      debugLog.push({ campo: 'prompt_violacion', detalles: violaciones })
-    }
-
-    // Filtrar nombres parciales y completos de un nombre principal
-    // (ej: si asegurado es "PAREDES LEON TABATHA", filtra también "LEON", "PAREDES", etc.)
-    const filtrarPorNombre = (lista: string[], nombrePrincipal: string): string[] => {
-      if (!nombrePrincipal) return lista
-      const normPrincipal = normalizar(nombrePrincipal)
-      const palabrasPrincipal = normPrincipal.split(' ').filter(p => p.length > 2)  // 3+ chars (antes era 4+)
-      return lista.filter((e: string) => {
-        const norm = normalizar(e)
-        // Match exacto → filtrar
-        if (norm === normPrincipal) return false
-        // Si la entidad es solo palabras del nombre principal → filtrar
-        const palabrasEnt = norm.split(' ').filter(p => p.length > 2)
-        if (palabrasEnt.length > 0 && palabrasEnt.every(p => palabrasPrincipal.includes(p))) return false
-        return true
-      })
-    }
-
-    // Para girador: filtrar el asegurado y el taller
-    const nombreAsegurado = data.datos_extra?.nombre_asegurado || ''
-    let entidadesParaGirador = filtrarPorNombre(entidadesFiltradas, nombreAsegurado)
-    if (tallerFinal) {
-      entidadesParaGirador = filtrarPorNombre(entidadesParaGirador, tallerFinal)
-    }
-
-    // Para taller: filtrar el asegurado y el girador
-    let entidadesParaTaller = filtrarPorNombre(entidadesFiltradas, nombreAsegurado)
-    if (giradorFinal) {
-      entidadesParaTaller = filtrarPorNombre(entidadesParaTaller, giradorFinal)
-    }
-
-    // Lista de candidatos para girador y taller (cada uno con su match BD relevante)
-    const candidatosGirador = construirCandidatos(giradorFinal, entidadesParaGirador, girMatch.nombre)
-    const candidatosTaller = construirCandidatos(tallerFinal, entidadesParaTaller, tallMatch.nombre)
-
-    // Para retrocompatibilidad: lista combinada de entidades (sin duplicados)
-    const entidadesCombinadas: string[] = []
-    const seenEnt = new Set<string>()
-    for (const e of [...candidatosGirador, ...candidatosTaller]) {
-      const n = normalizar(e)
-      if (!seenEnt.has(n)) {
-        entidadesCombinadas.push(e)
-        seenEnt.add(n)
-      }
-    }
-
-    // Detectar mismatch entre tipo seleccionado y tipo detectado por GPT
+    // ── PASO 10: Mismatch tipo seguro ──
     let alertaTipoSeguro: string | null = null
     const tipoDetectadoGPT = (data.tipo_seguro_detectado || '').toUpperCase().trim()
     if (
       tipoDetectadoGPT &&
       tipoDetectadoGPT !== tipoSeleccionado &&
-      tipoDetectadoGPT !== 'TALLER' &&  // GPT puede decir TALLER si no está seguro
-      tipoSeleccionado !== 'TALLER'    // si usuario eligió TALLER, no alertar
+      tipoDetectadoGPT !== 'TALLER' &&
+      tipoSeleccionado !== 'TALLER'
     ) {
       alertaTipoSeguro = tipoDetectadoGPT
     }
 
+    // ── PASO 11: Construir resultado final ──
     const output: any = {
       numero_siniestro: data.numero_siniestro || null,
       numero_orden: data.numero_orden || null,
       marca: data.marca || null,
       placa: data.placa || null,
       color: data.color || null,
-      tipo_seguro: tipoSeguroFinal,  // Respeta lo que usuario eligió, salvo TALLER inferido
+      tipo_seguro: tipoSeguroFinal,
       tipo_seguro_seleccionado: tipoSeleccionado,
       tipo_seguro_detectado: tipoDetectadoGPT || null,
-      alerta_tipo_seguro: alertaTipoSeguro,  // Avisar al frontend si hay mismatch
+      alerta_tipo_seguro: alertaTipoSeguro,
       nombre_girador: giradorFinal,
       taller_origen: tallerFinal,
       monto_total,
@@ -915,16 +737,11 @@ export async function POST(request: NextRequest) {
       piezas: piezasSaneadas,
       candidatos: {
         seguros: candidatos.seguros || [],
-        entidades: entidadesCombinadas,  // Lista enriquecida y filtrada (sin Rebiplast/Rafael)
-        candidatos_girador: candidatosGirador,  // Específicos para girador (principal + alternativas + match BD)
-        candidatos_taller: candidatosTaller,    // Específicos para taller (principal + alternativas + match BD)
+        entidades: entidadesCombinadas,
+        candidatos_girador: candidatosGirador,
+        candidatos_taller: candidatosTaller,
         numeros_documento: candidatos.numeros_documento || [],
       },
-      confianza: {
-        seguro: segMatch.fuente,
-        girador: girMatch.fuente,
-        taller: tallMatch.fuente || (tallerFinal ? 'gpt' : null),
-      }
     }
 
     // ── PASO 11: Registrar uso y descontar credito ──
