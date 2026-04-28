@@ -122,8 +122,15 @@ RIMAC tiene 2 formatos. Identifica cuál es:
 ▸ FORMATO 2 (Orden de compra): tabla con Item/Cantidad/Descripción/Monto
   - numero_orden: campo "N°" (ej: "60354")
   - numero_siniestro: "Siniestro N°"
-  - taller_origen: nombre después de "Sirvase entregar...a los Sres:"
+  - taller_origen: el nombre del TALLER que aparece después de la frase
+    "Sirvase entregar por nuestra cuenta, a los Sres: ___"
+    Ejemplos reales:
+    - "Sirvase entregar...a los Sres: SANTA CLARA" → taller = "SANTA CLARA"
+    - "Sirvase entregar...a los Sres: TOYO SERVICE" → taller = "TOYO SERVICE"
+    ⚠ ESTE CAMPO SIEMPRE EXISTE EN FORMATO 2. No dejar null.
+    Si ves esa frase ("Sirvase entregar...los Sres:"), TIENES taller.
   - nombre_girador: "TÉCNICO SINIESTROS VEHICULOS" (ej: "CESAR BANCES VENTO")
+    Aparece al final del documento, debajo de la firma.
   - placa: campo "Rodaje:" (NO está como "Placa:" en este formato)
     Ej: "Rodaje: CFU-921" → placa = "CFU-921"
   - marca: campo "Marca:" (ej: "ISUZU")

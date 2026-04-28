@@ -728,11 +728,29 @@ export async function POST(request: NextRequest) {
         // 4. Sigla aparece dentro de la descripción (ej: "REPARAR FUNDA DELT" contiene "FUNDA DELT")
         if (sigN.length >= 6 && descN.includes(sigN)) return reg
 
-        // 5. Todas las palabras del nombre están en la descripción
+        // 5. ALIAS aparece dentro de la descripción
+        // (ej: "REPARAR PARACHOQUE DELANTERO" contiene alias "PARACHOQUE DELANTERO")
+        // Solo aliases largos (≥10 chars) para evitar falsos positivos con palabras cortas
+        if (aliasN.some(a => a.length >= 10 && descN.includes(a))) return reg
+
+        // 6. Nombre completo aparece dentro de la descripción
+        if (nomN.length >= 8 && descN.includes(nomN)) return reg
+
+        // 7. Todas las palabras significativas del nombre están en la descripción
         if (palabrasDesc.length >= 2) {
           const palabrasNombre = nomN.split(' ').filter(p => p.length > 2)
           if (palabrasNombre.length >= 2) {
             const todasMatch = palabrasNombre.every(p => palabrasDesc.includes(p))
+            if (todasMatch) return reg
+          }
+        }
+
+        // 8. Todas las palabras significativas de algún alias están en la descripción
+        // (ej: "REPARAR NEBLINERO RH" → alias "NEBLINERO RH" → ambas palabras en descripción)
+        for (const alias of aliasN) {
+          const palabrasAlias = alias.split(' ').filter(p => p.length > 2)
+          if (palabrasAlias.length >= 2) {
+            const todasMatch = palabrasAlias.every(p => palabrasDesc.includes(p))
             if (todasMatch) return reg
           }
         }
