@@ -143,19 +143,113 @@ ESTRUCTURA TÍPICA MAPFRE:
 - numero_siniestro: campo "SINIESTRO:" (ej: "100130126007752")
 - taller_origen: campo "TALLER PRINCIPAL" (ej: "GACSA PERU S.A.C.")
   ⚠ NO usar "PROVEEDOR" porque ese es REBIPLAST
-- nombre_girador: el PERITO al final del documento
-  Buscar línea "* Perito: APELLIDO NOMBRE" (ej: "TAPIA HOSHI, LUIS EDUARDO")
 - placa, marca, color, año: en sección "DATOS DEL VEHÍCULO"
 - nombre_asegurado: campo "ASEGURADO:" arriba
 
-PIEZAS (en tabla "DESCRIPCIÓN Y EVALUACIÓN DE DAÑOS"):
-- Cada fila que empieza con "REP" + descripción es UNA pieza
-- Si una celda contiene MÚLTIPLES "REP xxx" en líneas distintas,
-  son PIEZAS SEPARADAS (no unir)
-  Ejemplo: "REP MOLDURA MALETERA / REP FUNDA DEL / REP REJILLA DEL"
-  → 3 piezas separadas
+═══════════════════════════════════════════════════════════════
+GIRADOR (CRÍTICO - REGLA ABSOLUTA)
+═══════════════════════════════════════════════════════════════
 
-MONTO: campo "TOTAL A FACTURAR" o "TOTAL GENERAL"
+EN MAPFRE, EL GIRADOR ES SIEMPRE EL PERITO. NUNCA ES EL ASEGURADO.
+
+Buscar al final del documento (entre las observaciones generales y la
+firma) la línea que empieza con asterisco:
+
+    * Perito: APELLIDO_PATERNO APELLIDO_MATERNO, NOMBRES
+
+Ejemplos reales:
+- "* Perito: TAPIA HOSHI, LUIS EDUARDO"      → girador = "TAPIA HOSHI, LUIS EDUARDO"
+- "* Perito: MORALES PIZARRO, WILLIAM ELIO"  → girador = "MORALES PIZARRO, WILLIAM ELIO"
+- "* Perito: ISLACHIN LOAYZA, RUBEN"         → girador = "ISLACHIN LOAYZA, RUBEN"
+
+REGLAS ESTRICTAS:
+- NUNCA poner el ASEGURADO como girador (es el dueño del carro, NO el girador)
+- NUNCA poner "REBIPLAST" (es el proveedor)
+- NUNCA poner el nombre del taller (TALLER PRINCIPAL) como girador
+- Si NO encuentras "* Perito:" en el documento, dejar nombre_girador = null
+
+═══════════════════════════════════════════════════════════════
+PIEZAS — INTERPRETACIÓN PRECISA (CRÍTICO)
+═══════════════════════════════════════════════════════════════
+
+Las piezas están en la tabla "DESCRIPCIÓN Y EVALUACIÓN DE DAÑOS".
+Cada fila es UNA pieza. La columna "D" suele tener "REP" (que es el
+CÓDIGO DE OPERACIÓN, no significa siempre reparación).
+
+LO QUE DEFINE EL TRABAJO ES LA DESCRIPCIÓN, NO EL CÓDIGO "REP":
+
+▸ "REPARACIONES FUNDA DELT" 
+  → reparación de funda delantera
+  → requiere_reparacion=true, lado="DELT", tipo_trabajo="R"
+
+▸ "REPARACIONES FUNDA POSTERIOR"
+  → requiere_reparacion=true, lado="POST", tipo_trabajo="R"
+
+▸ "REPARACIONES PULIDO DE FARO DELT RH"
+  → ¡OJO! "REPARACIONES" es solo el nombre de la columna.
+  → El trabajo real es PULIDO de FARO.
+  → es_faro=true, requiere_pulido=true, requiere_reparacion=FALSE
+  → lado="RH" (lado lateral más importante que delantero)
+  → tipo_trabajo="PU" (pulido de faro)
+
+▸ "REPARACIONES PINTURA DE PARACHOQUE"
+  → solo pintura
+  → requiere_pintura=true, requiere_reparacion=false, tipo_trabajo="P"
+
+▸ "REPARACIONES REP MOLDURA MALETERA"
+  → reparación
+  → requiere_reparacion=true, tipo_trabajo="R"
+
+PALABRAS CLAVE en la descripción (NO en la columna):
+- Si dice "PULIDO" → requiere_pulido=true (NO reparación)
+- Si dice "PINTURA" sin "REP" → requiere_pintura=true
+- Si dice "REP" o "REPARACIÓN" en la descripción real → requiere_reparacion=true
+- Si dice "FARO" o "NEBLINERO" → es_faro=true
+
+═══════════════════════════════════════════════════════════════
+LADOS — REGLA DE PRIORIDAD
+═══════════════════════════════════════════════════════════════
+
+Cuando una descripción tiene VARIAS palabras de posición, priorizar
+el lado lateral sobre el delantero/posterior:
+
+▸ "FARO DELT RH"  → lado="RH" (RH es más específico)
+▸ "FUNDA POST LH" → lado="LH"
+▸ "FUNDA DELT"    → lado="DELT" (no hay lado lateral)
+▸ "MOLDURA POST"  → lado="POST"
+
+Reglas individuales:
+- LH / IZQ / Izquierdo → "LH"
+- RH / DER / Derecho → "RH"
+- DEL / DELT / Delantero → "DELT"
+- POST / Posterior / Trasero → "POST"
+- Sin posición clara → "N/A"
+
+Si una pieza tiene tanto lado lateral COMO posición delantera/posterior:
+- Anotar el lado lateral (LH/RH) como "lado"
+- La posición delantera/posterior va en el NOMBRE de la pieza
+
+═══════════════════════════════════════════════════════════════
+PIEZAS MULTILÍNEA
+═══════════════════════════════════════════════════════════════
+
+Si una celda contiene MÚLTIPLES "REP xxx" en líneas distintas,
+son PIEZAS SEPARADAS (una por línea).
+
+Ejemplo:
+"REP MOLDURA MALETERA
+REP FUNDA DEL
+REP REJILLA DEL
+REP SPOYLER INF"
+→ 4 piezas separadas
+
+═══════════════════════════════════════════════════════════════
+MONTOS
+═══════════════════════════════════════════════════════════════
+
+monto_total: campo "TOTAL A FACTURAR" o "TOTAL GENERAL S/."
+moneda: si dice "S/." → "PEN", si dice "US$" → "USD"
+monto por pieza: el valor en la columna "PRECIO" de cada fila
 ${COMUN}`
 
 // =============================================================
