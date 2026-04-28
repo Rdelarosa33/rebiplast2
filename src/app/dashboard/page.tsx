@@ -16,5 +16,6 @@ export default async function DashboardPage() {
   if (profile.role === 'supervisor') return <DashboardSupervisor />
   if (profile.role === 'recojo') return <DashboardRecojo />
   if (profile.role === 'owner') return <DashboardOwner />
+  if (profile.role === 'mantenimiento') redirect('/mantenimiento')
   return <DashboardTrabajadorInicio profile={profile} />
 }

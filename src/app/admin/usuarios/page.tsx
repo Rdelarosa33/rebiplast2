@@ -13,6 +13,7 @@ export default async function UsuariosPage() {
   const { data: usuarios } = await supabase
     .from('profiles')
     .select('*')
+    .neq('role', 'mantenimiento')   // Admin NO debe ver usuarios mantenimiento
     .order('role')
     .order('nombre')
 

@@ -22,6 +22,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
     }
 
+    // El rol mantenimiento NO puede ser asignado por admin (es un rol técnico exclusivo)
+    if (role === 'mantenimiento') {
+      return NextResponse.json({ error: 'No autorizado para asignar este rol' }, { status: 403 })
+    }
+
     // Crear usuario en auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
@@ -55,6 +60,20 @@ export async function PATCH(request: NextRequest) {
 
     const { userId, password, nombre, apellido, role } = await request.json()
     if (!userId) return NextResponse.json({ error: 'userId requerido' }, { status: 400 })
+
+    // No permitir cambiar a mantenimiento ni modificar usuarios mantenimiento
+    if (role === 'mantenimiento') {
+      return NextResponse.json({ error: 'No autorizado para asignar este rol' }, { status: 403 })
+    }
+    // Verificar que el usuario que se edita no sea mantenimiento (admin no puede tocarlo)
+    const { data: usuarioObjetivo } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', userId)
+      .single()
+    if (usuarioObjetivo?.role === 'mantenimiento') {
+      return NextResponse.json({ error: 'No autorizado para editar este usuario' }, { status: 403 })
+    }
 
     // Cambiar contraseña si se envió
     if (password) {

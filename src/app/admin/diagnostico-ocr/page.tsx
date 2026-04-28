@@ -9,7 +9,7 @@ export const revalidate = 0
 
 export default async function DiagnosticoOCRPage() {
   const profile = await getCurrentUser()
-  if (!profile || !['admin', 'owner'].includes(profile.role)) redirect('/dashboard')
+  if (!profile || profile.role !== 'mantenimiento') redirect('/dashboard')
 
   const supabase = await createClient()
 
