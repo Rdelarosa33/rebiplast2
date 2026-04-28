@@ -226,8 +226,10 @@ async function optimizarImagen(bytes: ArrayBuffer): Promise<{ base64: string; mi
   try {
     const sharp = (await import('sharp')).default
     const optimized = await sharp(Buffer.from(bytes))
-      .resize({ width: 1200, withoutEnlargement: true })
-      .jpeg({ quality: 70 })
+      .rotate()                                       // Auto-rotar según EXIF (corrige fotos verticales)
+      .grayscale()                                    // A escala de grises (texto B/N en órdenes)
+      .resize({ width: 800, withoutEnlargement: true }) // Resize a 800px (~60% menos tokens vs 1200)
+      .jpeg({ quality: 70, mozjpeg: true })           // mozjpeg comprime ~10% más con misma calidad
       .toBuffer()
     return { base64: optimized.toString('base64'), mimeType: 'image/jpeg' }
   } catch {
