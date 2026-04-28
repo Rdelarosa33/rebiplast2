@@ -3,12 +3,11 @@
 import { useState } from 'react'
 import {
   ChevronDown, ChevronUp, RefreshCw, TrendingDown, Check, X, FileText,
-  ScanLine, AlertTriangle, Calendar as CalendarIcon, DollarSign
+  ScanLine, AlertTriangle, Calendar as CalendarIcon
 } from 'lucide-react'
 import {
   marcarRecargaPagada, registrarPagoDetalladoRecarga,
   marcarSuscripcionPagada, registrarPagoDetalladoSuscripcion,
-  generarDeudaSuscripcion,
 } from './actions'
 
 interface Recarga {
@@ -69,8 +68,8 @@ export default function GestionPagos({
   const [modal, setModal] = useState<{ tipo: 'recarga' | 'suscripcion'; item: any } | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
   const [loading, setLoading] = useState<string | null>(null)
-  const [generando, setGenerando] = useState(false)
 
+  // Filtrar recargas automáticas (que son las cobrables)
   const recargasAuto = recargas.filter(r => r.automatica)
   const recargasFiltradas = recargasAuto.filter(r => {
     if (filtroRecargas === 'pendientes') return !r.pagada
@@ -84,13 +83,19 @@ export default function GestionPagos({
     return true
   })
 
-  const totalDeudaPlanes = pagosSus.filter(p => !p.pagada).reduce((acc, p) => acc + Number(p.monto), 0)
-  const totalDeudaRecargas = recargasAuto.filter(r => !r.pagada).reduce((acc, r) => acc + Number(r.monto), 0)
-  const totalDeuda = totalDeudaPlanes + totalDeudaRecargas
+  // Cálculos del SALDO TOTAL
+  const deudaPlanes = pagosSus.filter(p => !p.pagada).reduce((acc, p) => acc + Number(p.monto), 0)
+  const deudaRecargas = recargasAuto.filter(r => !r.pagada).reduce((acc, r) => acc + Number(r.monto), 0)
+  const totalAdeudado = deudaPlanes + deudaRecargas
 
-  const totalPagadoPlanes = pagosSus.filter(p => p.pagada).reduce((acc, p) => acc + Number(p.monto_pagado || p.monto), 0)
-  const totalPagadoRecargas = recargasAuto.filter(r => r.pagada).reduce((acc, r) => acc + Number(r.monto_pagado || r.monto), 0)
-  const totalPagado = totalPagadoPlanes + totalPagadoRecargas
+  const pagadoPlanes = pagosSus.filter(p => p.pagada).reduce((acc, p) => acc + Number(p.monto_pagado || p.monto), 0)
+  const pagadoRecargas = recargasAuto.filter(r => r.pagada).reduce((acc, r) => acc + Number(r.monto_pagado || r.monto), 0)
+  const totalPagado = pagadoPlanes + pagadoRecargas
+
+  const cantPlanesPendientes = pagosSus.filter(p => !p.pagada).length
+  const cantRecargasPendientes = recargasAuto.filter(r => !r.pagada).length
+  const cantPagosPlanes = pagosSus.filter(p => p.pagada).length
+  const cantPagosRecargas = recargasAuto.filter(r => r.pagada).length
 
   // Acciones
   const marcarRapido = async (item: any, tipo: 'recarga' | 'suscripcion') => {
@@ -103,32 +108,58 @@ export default function GestionPagos({
     setLoading(null)
   }
 
-  const generarMes = async () => {
-    setGenerando(true)
-    setErrorMsg('')
-    const result = await generarDeudaSuscripcion()
-    if (result.error) setErrorMsg(result.error)
-    if (result.warn) setErrorMsg(result.warn)
-    setGenerando(false)
-  }
-
   return (
     <>
-      {/* Resumen general — totales */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="card p-4 border-amber-500/30">
-          <p className="text-xs text-[#475569]">Deuda total acumulada</p>
-          <p className="text-3xl font-syne font-bold text-amber-400 mt-1">${totalDeuda.toFixed(2)}</p>
-          <p className="text-xs text-[#475569] mt-1">
-            ${totalDeudaPlanes.toFixed(2)} planes · ${totalDeudaRecargas.toFixed(2)} recargas
-          </p>
+      {/* SALDO TOTAL — bloque destacado */}
+      <div className="card p-5 border-[#00D4FF]/30 bg-gradient-to-br from-[#0D1117] to-[#131920]">
+        <h2 className="text-sm font-syne font-bold text-[#94A3B8] uppercase tracking-wide mb-3">Saldo total</h2>
+
+        {/* Desglose deuda */}
+        <div className="space-y-1.5 mb-4">
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-[#94A3B8]">
+              <CalendarIcon size={12} className="inline mr-1.5 text-amber-400" />
+              Deudas mensuales ({cantPlanesPendientes})
+            </span>
+            <span className="font-mono text-amber-400">${deudaPlanes.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-[#94A3B8]">
+              <RefreshCw size={12} className="inline mr-1.5 text-amber-400" />
+              Recargas OCR ({cantRecargasPendientes})
+            </span>
+            <span className="font-mono text-amber-400">${deudaRecargas.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between items-center pt-2 border-t border-[#1E2D42]">
+            <span className="text-sm font-semibold text-white">Subtotal deuda</span>
+            <span className="font-mono font-bold text-amber-400">${totalAdeudado.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between items-center text-sm pt-1">
+            <span className="text-[#94A3B8]">
+              <Check size={12} className="inline mr-1.5 text-green-400" />
+              Pagado ({cantPagosPlanes + cantPagosRecargas})
+            </span>
+            <span className="font-mono text-green-400">−${totalPagado.toFixed(2)}</span>
+          </div>
         </div>
-        <div className="card p-4 border-green-500/30">
-          <p className="text-xs text-[#475569]">Total pagado</p>
-          <p className="text-3xl font-syne font-bold text-green-400 mt-1">${totalPagado.toFixed(2)}</p>
-          <p className="text-xs text-[#475569] mt-1">
-            ${totalPagadoPlanes.toFixed(2)} planes · ${totalPagadoRecargas.toFixed(2)} recargas
-          </p>
+
+        {/* Saldo final */}
+        <div className="bg-[#0D1117] rounded-xl p-4 border border-amber-500/30 flex items-center justify-between">
+          <div>
+            <p className="text-xs text-[#475569]">Saldo pendiente por cobrar</p>
+            <p className="text-3xl font-syne font-bold text-amber-400 mt-1">${totalAdeudado.toFixed(2)}</p>
+          </div>
+          {totalAdeudado === 0 ? (
+            <div className="text-right">
+              <Check size={32} className="text-green-400 ml-auto" />
+              <p className="text-xs text-green-400 mt-1">Todo al día</p>
+            </div>
+          ) : (
+            <div className="text-right">
+              <AlertTriangle size={32} className="text-amber-400 ml-auto" />
+              <p className="text-xs text-amber-400 mt-1">Por cobrar</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -145,7 +176,7 @@ export default function GestionPagos({
           className="w-full flex items-center gap-2 p-5 hover:bg-[#131920] transition-colors"
         >
           <CalendarIcon size={18} className="text-[#00D4FF]" />
-          <h2 className="font-syne font-semibold text-white flex-1 text-left">Planes mensuales (${precioPlan}/mes)</h2>
+          <h2 className="font-syne font-semibold text-white flex-1 text-left">Cuotas mensuales (${precioPlan}/mes)</h2>
           <span className="text-xs bg-[#131920] border border-[#1E2D42] text-[#94A3B8] px-2 py-0.5 rounded-full">
             {planesFiltrados.length}
           </span>
@@ -154,36 +185,24 @@ export default function GestionPagos({
 
         {planesAbierto && (
           <div className="px-5 pb-5 space-y-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex gap-2">
-                {[
-                  { key: 'pendientes', label: 'Pendientes' },
-                  { key: 'pagados', label: 'Pagados' },
-                  { key: 'todos', label: 'Todos' },
-                ].map(f => (
-                  <button
-                    key={f.key}
-                    onClick={() => setFiltroPlanes(f.key as any)}
-                    className={`text-xs px-3 py-1.5 rounded-full border transition-all ${
-                      filtroPlanes === f.key
-                        ? 'bg-[#00D4FF] text-[#080B12] border-[#00D4FF] font-semibold'
-                        : 'bg-[#131920] text-[#475569] border-[#1E2D42] hover:text-white'
-                    }`}
-                  >
-                    {f.label}
-                  </button>
-                ))}
-              </div>
-              {puedeModificar && (
+            <div className="flex gap-2">
+              {[
+                { key: 'pendientes', label: 'Pendientes' },
+                { key: 'pagados', label: 'Pagadas' },
+                { key: 'todos', label: 'Todas' },
+              ].map(f => (
                 <button
-                  onClick={generarMes}
-                  disabled={generando}
-                  className="ml-auto text-xs bg-amber-500/20 border border-amber-500/30 text-amber-400 hover:bg-amber-500/30 rounded-lg px-3 py-1.5 disabled:opacity-50 flex items-center gap-1.5"
+                  key={f.key}
+                  onClick={() => setFiltroPlanes(f.key as any)}
+                  className={`text-xs px-3 py-1.5 rounded-full border transition-all ${
+                    filtroPlanes === f.key
+                      ? 'bg-[#00D4FF] text-[#080B12] border-[#00D4FF] font-semibold'
+                      : 'bg-[#131920] text-[#475569] border-[#1E2D42] hover:text-white'
+                  }`}
                 >
-                  <DollarSign size={12} />
-                  {generando ? 'Generando…' : 'Generar deuda del mes'}
+                  {f.label}
                 </button>
-              )}
+              ))}
             </div>
 
             {planesFiltrados.length === 0 ? (
@@ -201,20 +220,18 @@ export default function GestionPagos({
                               ? 'bg-green-500/20 text-green-400 border border-green-500/30'
                               : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                           }`}>
-                            {p.pagada ? 'PAGADO' : 'PENDIENTE'}
+                            {p.pagada ? 'PAGADA' : 'PENDIENTE'}
                           </span>
-                          <span className="text-xs text-[#94A3B8] font-mono">{p.periodo}</span>
                         </div>
+                        <p className="text-xs text-[#94A3B8] mt-0.5">{p.nota || `Periodo ${p.periodo}`}</p>
                         <p className="text-xs text-[#475569] mt-0.5">
-                          Generado: {new Date(p.created_at).toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                          Generada: {new Date(p.created_at).toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                         </p>
                         {p.pagada && p.fecha_pago && (
                           <p className="text-xs text-green-400 mt-0.5">
-                            Pagado: {new Date(p.fecha_pago).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' })}
-                            {p.monto_pagado && ` · $${Number(p.monto_pagado).toFixed(2)}`}
+                            ✓ Pagada el {new Date(p.fecha_pago).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' })}
                           </p>
                         )}
-                        {p.nota && <p className="text-xs text-[#94A3B8] mt-0.5">{p.nota}</p>}
                       </div>
                     </div>
                     {puedeModificar && !p.pagada && (
@@ -225,7 +242,7 @@ export default function GestionPagos({
                           className="flex-1 text-xs bg-green-500/20 border border-green-500/30 text-green-400 hover:bg-green-500/30 rounded-lg px-3 py-1.5 flex items-center justify-center gap-1 disabled:opacity-50"
                         >
                           <Check size={12} />
-                          {loading === p.id ? 'Guardando…' : 'Marcar pagado'}
+                          {loading === p.id ? 'Guardando…' : 'Marcar pagada'}
                         </button>
                         <button
                           onClick={() => setModal({ tipo: 'suscripcion', item: p })}
@@ -305,11 +322,10 @@ export default function GestionPagos({
                         </p>
                         {r.pagada && r.fecha_pago && (
                           <p className="text-xs text-green-400 mt-0.5">
-                            Pagado: {new Date(r.fecha_pago).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' })}
-                            {r.monto_pagado && ` · $${Number(r.monto_pagado).toFixed(2)}`}
+                            ✓ Pagada el {new Date(r.fecha_pago).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' })}
                           </p>
                         )}
-                        {r.nota && <p className="text-xs text-[#94A3B8] mt-0.5">{r.nota}</p>}
+                        {r.nota && r.nota !== 'Recarga automática' && <p className="text-xs text-[#94A3B8] mt-0.5">{r.nota}</p>}
                       </div>
                       <div className="text-right text-xs text-[#475569] flex-shrink-0">
                         Saldo: ${Number(r.saldo_nuevo)?.toFixed(2)}
@@ -387,7 +403,7 @@ export default function GestionPagos({
         )}
       </div>
 
-      {/* Modal pago detallado */}
+      {/* Modal pago detallado (solo fecha y nota, sin monto editable) */}
       {modal && (
         <ModalPagoDetallado
           tipo={modal.tipo}
@@ -401,7 +417,7 @@ export default function GestionPagos({
 }
 
 // =============================================================
-// Modal pago detallado (recarga o suscripción)
+// Modal pago detallado — solo fecha y nota (monto fijo = total)
 // =============================================================
 
 function ModalPagoDetallado({
@@ -415,7 +431,6 @@ function ModalPagoDetallado({
   onClose: () => void
   onSuccess: () => void
 }) {
-  const [montoPagado, setMontoPagado] = useState(String(item.monto))
   const [fechaPago, setFechaPago] = useState(new Date().toISOString().split('T')[0])
   const [nota, setNota] = useState('')
   const [loading, setLoading] = useState(false)
@@ -425,16 +440,8 @@ function ModalPagoDetallado({
     setLoading(true)
     setError('')
     const result = tipo === 'recarga'
-      ? await registrarPagoDetalladoRecarga(item.id, {
-          monto_pagado: parseFloat(montoPagado),
-          fecha_pago: fechaPago,
-          nota,
-        })
-      : await registrarPagoDetalladoSuscripcion(item.id, {
-          monto_pagado: parseFloat(montoPagado),
-          fecha_pago: fechaPago,
-          nota,
-        })
+      ? await registrarPagoDetalladoRecarga(item.id, { fecha_pago: fechaPago, nota })
+      : await registrarPagoDetalladoSuscripcion(item.id, { fecha_pago: fechaPago, nota })
     if (result.error) {
       setError(result.error)
       setLoading(false)
@@ -448,7 +455,7 @@ function ModalPagoDetallado({
       <div className="bg-[#0D1117] border border-[#1E2D42] rounded-2xl p-5 max-w-md w-full space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-syne font-bold text-white">
-            Registrar pago {tipo === 'suscripcion' ? 'de plan' : 'de recarga'}
+            Registrar pago {tipo === 'suscripcion' ? 'de cuota' : 'de recarga'}
           </h3>
           <button onClick={onClose} className="text-[#475569] hover:text-white">
             <X size={20} />
@@ -456,27 +463,16 @@ function ModalPagoDetallado({
         </div>
 
         <div className="bg-[#131920] rounded-xl p-3 text-xs">
-          <p className="text-[#475569]">
-            {tipo === 'recarga' ? 'Recarga original' : `Plan ${item.periodo}`}
-          </p>
-          <p className="text-white mt-0.5">
-            <span className="font-semibold text-green-400">${Number(item.monto).toFixed(2)}</span>
-            {' · '}
-            {new Date(item.created_at).toLocaleDateString('es-PE')}
+          <p className="text-[#475569]">Monto a pagar (completo)</p>
+          <p className="text-2xl font-syne font-bold text-green-400 mt-1">${Number(item.monto).toFixed(2)}</p>
+          <p className="text-[#475569] mt-1">
+            {tipo === 'recarga'
+              ? `Recarga del ${new Date(item.created_at).toLocaleDateString('es-PE')}`
+              : (item.nota || `Periodo ${item.periodo}`)}
           </p>
         </div>
 
         <div className="space-y-3">
-          <div>
-            <label className="text-xs text-[#475569] block mb-1">Monto pagado (USD)</label>
-            <input
-              type="number"
-              step="0.01"
-              value={montoPagado}
-              onChange={e => setMontoPagado(e.target.value)}
-              className="input-field w-full"
-            />
-          </div>
           <div>
             <label className="text-xs text-[#475569] block mb-1">Fecha de pago</label>
             <input
@@ -491,7 +487,7 @@ function ModalPagoDetallado({
             <textarea
               value={nota}
               onChange={e => setNota(e.target.value)}
-              placeholder="Ej: Yape 1234 · Pago parcial · etc."
+              placeholder="Ej: Yape 1234, Plin, Transferencia BCP, etc."
               rows={2}
               className="input-field w-full"
             />
@@ -503,10 +499,10 @@ function ModalPagoDetallado({
         <div className="flex gap-2">
           <button
             onClick={guardar}
-            disabled={loading || !montoPagado || !fechaPago}
+            disabled={loading || !fechaPago}
             className="flex-1 btn-primary text-sm py-2 disabled:opacity-50"
           >
-            {loading ? 'Guardando…' : 'Registrar pago'}
+            {loading ? 'Guardando…' : 'Confirmar pago'}
           </button>
           <button onClick={onClose} className="text-sm bg-[#131920] border border-[#1E2D42] text-[#94A3B8] px-4 py-2 rounded-lg">
             Cancelar

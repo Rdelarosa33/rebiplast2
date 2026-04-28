@@ -276,7 +276,7 @@ export async function POST(request: NextRequest) {
         monto: RECARGA_AUTO,
         saldo_anterior: saldoAnterior,
         saldo_nuevo: saldoNuevo,
-        nota: 'Recarga automática (gratis, pendiente cobro)',
+        nota: 'Recarga automática',
         automatica: true,
         pagada: false,
       })

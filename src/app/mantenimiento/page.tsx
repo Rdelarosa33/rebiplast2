@@ -4,12 +4,16 @@ import { redirect } from 'next/navigation'
 import { CreditCard, Bug, Wrench } from 'lucide-react'
 import Link from 'next/link'
 import GestionPagos from './GestionPagos'
+import { autogenerarDeudas } from './actions'
 
 export const revalidate = 0
 
 export default async function MantenimientoPage() {
   const profile = await getCurrentUser()
   if (!profile || profile.role !== 'mantenimiento') redirect('/dashboard')
+
+  // Auto-generar deudas mensuales que falten antes de mostrar el panel
+  await autogenerarDeudas()
 
   const supabase = await createClient()
   const [

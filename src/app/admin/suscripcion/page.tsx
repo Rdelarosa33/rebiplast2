@@ -4,12 +4,18 @@ import { redirect } from 'next/navigation'
 import { Calendar, CreditCard } from 'lucide-react'
 import DesgloseSuscripcion from './DesgloseSuscripcion'
 import GestionPagos from '@/app/mantenimiento/GestionPagos'
+import { autogenerarDeudas } from '@/app/mantenimiento/actions'
 
 export const revalidate = 0
 
 export default async function SuscripcionPage() {
   const profile = await getCurrentUser()
   if (!profile || !['admin', 'owner'].includes(profile.role)) redirect('/dashboard')
+
+  // Si es owner, auto-generar deudas mensuales que falten antes de mostrar el panel
+  if (profile.role === 'owner') {
+    await autogenerarDeudas()
+  }
 
   const supabase = await createClient()
   const { data: sus } = await supabase.from('suscripcion').select('*').single()
