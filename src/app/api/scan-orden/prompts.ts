@@ -136,6 +136,28 @@ EL USUARIO YA CONFIRMÓ QUE ES MAPFRE, ASUME tipo_seguro = "MAPFRE".
 Si la imagen NO es de Mapfre, pon tipo_seguro_detectado con el real.
 
 ═══════════════════════════════════════════════════════════════
+⛔ REGLAS ABSOLUTAS - NUNCA HAGAS ESTO ⛔
+═══════════════════════════════════════════════════════════════
+
+NUNCA, BAJO NINGUNA CIRCUNSTANCIA, PONGAS:
+
+❌ "REBIPLAST" / "REBIPLAST EIRL" / "REBIPLAST E.I.R.L." como girador
+   → Rebiplast es SIEMPRE el PROVEEDOR. NUNCA el girador.
+   → Si dudas, prefiere null antes que Rebiplast.
+
+❌ El nombre del TALLER PRINCIPAL como girador
+   → El taller (ej: "GACSA PERU S.A.C.") es taller_origen, NO girador.
+
+❌ El nombre del ASEGURADO como girador
+   → El asegurado (ej: "PAREDES LEON TABATHA PAMELA") es el dueño del carro.
+   → NUNCA es girador.
+
+❌ Razones sociales con "S.A.C.", "E.I.R.L.", "S.A." en girador
+   → Empresas no son giradores en MAPFRE. El girador es una PERSONA NATURAL (perito).
+
+Si no encuentras un PERITO claro en el documento → nombre_girador = null
+
+═══════════════════════════════════════════════════════════════
 ESTRUCTURA TÍPICA MAPFRE:
 ═══════════════════════════════════════════════════════════════
 
@@ -147,29 +169,44 @@ ESTRUCTURA TÍPICA MAPFRE:
 - nombre_asegurado: campo "ASEGURADO:" arriba
 
 ═══════════════════════════════════════════════════════════════
-GIRADOR (CRÍTICO - REGLA ABSOLUTA)
+GIRADOR = PERITO (REGLA ABSOLUTA)
 ═══════════════════════════════════════════════════════════════
 
-EN MAPFRE, EL GIRADOR ES SIEMPRE EL PERITO. NUNCA ES EL ASEGURADO.
+EN MAPFRE, EL GIRADOR ES SIEMPRE EL PERITO. ES UNA PERSONA NATURAL.
 
-Buscar al final del documento (entre las observaciones generales y la
-firma) la línea que empieza con asterisco:
+DÓNDE BUSCAR EL PERITO:
+
+Al final del documento, después de las observaciones generales,
+hay líneas que empiezan con asterisco (*). Busca específicamente
+la que contiene "Perito" o "PERITO":
 
     * Perito: APELLIDO_PATERNO APELLIDO_MATERNO, NOMBRES
 
-Ejemplos reales:
-- "* Perito: TAPIA HOSHI, LUIS EDUARDO"      → girador = "TAPIA HOSHI, LUIS EDUARDO"
-- "* Perito: MORALES PIZARRO, WILLIAM ELIO"  → girador = "MORALES PIZARRO, WILLIAM ELIO"
-- "* Perito: ISLACHIN LOAYZA, RUBEN"         → girador = "ISLACHIN LOAYZA, RUBEN"
+EJEMPLOS REALES (toma el texto DESPUÉS de "Perito:"):
 
-REGLAS ESTRICTAS:
-- NUNCA poner el ASEGURADO como girador (es el dueño del carro, NO el girador)
-- NUNCA poner "REBIPLAST" (es el proveedor)
-- NUNCA poner el nombre del taller (TALLER PRINCIPAL) como girador
-- Si NO encuentras "* Perito:" en el documento, dejar nombre_girador = null
+▸ "* Perito: TAPIA HOSHI, LUIS EDUARDO"
+   → nombre_girador = "TAPIA HOSHI, LUIS EDUARDO"
+
+▸ "* Perito: MORALES PIZARRO, WILLIAM ELIO"
+   → nombre_girador = "MORALES PIZARRO, WILLIAM ELIO"
+
+▸ "* Perito: ISLACHIN LOAYZA, RUBEN"
+   → nombre_girador = "ISLACHIN LOAYZA, RUBEN"
+
+IMPORTANTE: La línea "* Perito:" suele estar entre líneas como:
+- "* Tipo de cambio: 1.00"
+- "* Presupuesto referencial sujeto a..."
+- "* Montos sin considerar IGV"
+- "* La factura debe ser presentada..."
+- "* La vigencia de la orden..."
+
+NO confundas estas otras líneas con "* Perito:". Lee con cuidado.
+
+Si después de buscar bien NO encuentras una línea "* Perito:" en
+el documento, deja nombre_girador = null. NO inventes.
 
 ═══════════════════════════════════════════════════════════════
-PIEZAS — INTERPRETACIÓN PRECISA (CRÍTICO)
+PIEZAS — INTERPRETACIÓN PRECISA
 ═══════════════════════════════════════════════════════════════
 
 Las piezas están en la tabla "DESCRIPCIÓN Y EVALUACIÓN DE DAÑOS".
@@ -178,7 +215,7 @@ CÓDIGO DE OPERACIÓN, no significa siempre reparación).
 
 LO QUE DEFINE EL TRABAJO ES LA DESCRIPCIÓN, NO EL CÓDIGO "REP":
 
-▸ "REPARACIONES FUNDA DELT" 
+▸ "REPARACIONES FUNDA DELT"
   → reparación de funda delantera
   → requiere_reparacion=true, lado="DELT", tipo_trabajo="R"
 
@@ -224,10 +261,6 @@ Reglas individuales:
 - DEL / DELT / Delantero → "DELT"
 - POST / Posterior / Trasero → "POST"
 - Sin posición clara → "N/A"
-
-Si una pieza tiene tanto lado lateral COMO posición delantera/posterior:
-- Anotar el lado lateral (LH/RH) como "lado"
-- La posición delantera/posterior va en el NOMBRE de la pieza
 
 ═══════════════════════════════════════════════════════════════
 PIEZAS MULTILÍNEA

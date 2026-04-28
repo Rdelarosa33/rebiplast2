@@ -821,25 +821,57 @@ export async function POST(request: NextRequest) {
     // Filtrar entidades para quitar prohibidos
     const entidadesFiltradas = entidadesUnif.filter((e: string) => !estaProhibido(e))
 
-    // Para girador: filtrar también el nombre del asegurado
-    // (el asegurado es el cliente final, NUNCA es girador)
+    // LOG SILENCIOSO: detectar si GPT intentó poner Rebiplast/Rafael (violación del prompt)
+    const violaciones: string[] = []
+    if (estaProhibido(data.nombre_girador || '')) {
+      violaciones.push(`girador: ${data.nombre_girador}`)
+    }
+    if (estaProhibido(data.taller_origen || '')) {
+      violaciones.push(`taller: ${data.taller_origen}`)
+    }
+    for (const ent of (candidatos.entidades || [])) {
+      if (estaProhibido(ent)) {
+        violaciones.push(`entidad: ${ent}`)
+        break  // Solo loguear una vez para no saturar
+      }
+    }
+    if (violaciones.length > 0) {
+      debugLog.push({ campo: 'prompt_violacion', detalles: violaciones })
+    }
+
+    // Filtrar nombres parciales y completos de un nombre principal
+    // (ej: si asegurado es "PAREDES LEON TABATHA", filtra también "LEON", "PAREDES", etc.)
+    const filtrarPorNombre = (lista: string[], nombrePrincipal: string): string[] => {
+      if (!nombrePrincipal) return lista
+      const normPrincipal = normalizar(nombrePrincipal)
+      const palabrasPrincipal = normPrincipal.split(' ').filter(p => p.length > 2)  // 3+ chars (antes era 4+)
+      return lista.filter((e: string) => {
+        const norm = normalizar(e)
+        // Match exacto → filtrar
+        if (norm === normPrincipal) return false
+        // Si la entidad es solo palabras del nombre principal → filtrar
+        const palabrasEnt = norm.split(' ').filter(p => p.length > 2)
+        if (palabrasEnt.length > 0 && palabrasEnt.every(p => palabrasPrincipal.includes(p))) return false
+        return true
+      })
+    }
+
+    // Para girador: filtrar el asegurado y el taller
     const nombreAsegurado = data.datos_extra?.nombre_asegurado || ''
-    const entidadesParaGirador = entidadesFiltradas.filter((e: string) => {
-      if (!nombreAsegurado) return true
-      const norm = normalizar(e)
-      const normAseg = normalizar(nombreAsegurado)
-      // Si la entidad es exactamente el asegurado o lo contiene casi todo, filtrarla
-      if (norm === normAseg) return false
-      // Filtrar también nombres parciales del asegurado (ej: "LEON" si el asegurado es "PAREDES LEON TABATHA")
-      const palabrasAseg = normAseg.split(' ').filter(p => p.length > 3)
-      const palabrasEnt = norm.split(' ').filter(p => p.length > 3)
-      if (palabrasEnt.length > 0 && palabrasEnt.every(p => palabrasAseg.includes(p))) return false
-      return true
-    })
+    let entidadesParaGirador = filtrarPorNombre(entidadesFiltradas, nombreAsegurado)
+    if (tallerFinal) {
+      entidadesParaGirador = filtrarPorNombre(entidadesParaGirador, tallerFinal)
+    }
+
+    // Para taller: filtrar el asegurado y el girador
+    let entidadesParaTaller = filtrarPorNombre(entidadesFiltradas, nombreAsegurado)
+    if (giradorFinal) {
+      entidadesParaTaller = filtrarPorNombre(entidadesParaTaller, giradorFinal)
+    }
 
     // Lista de candidatos para girador y taller (cada uno con su match BD relevante)
     const candidatosGirador = construirCandidatos(giradorFinal, entidadesParaGirador, girMatch.nombre)
-    const candidatosTaller = construirCandidatos(tallerFinal, entidadesFiltradas, tallMatch.nombre)
+    const candidatosTaller = construirCandidatos(tallerFinal, entidadesParaTaller, tallMatch.nombre)
 
     // Para retrocompatibilidad: lista combinada de entidades (sin duplicados)
     const entidadesCombinadas: string[] = []
