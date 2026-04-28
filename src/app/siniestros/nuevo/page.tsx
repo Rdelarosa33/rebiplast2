@@ -39,6 +39,8 @@ export default function NuevoSiniestroPage() {
   const [formKey, setFormKey] = useState(0)
   const [scanResult, setScanResult] = useState<{ data?: any; debug?: any[]; gpt_raw?: string } | null>(null)
   const [advertenciaCalidad, setAdvertenciaCalidad] = useState<{ problemas: string[]; archivo: File } | null>(null)
+  const [tipoSeleccionado, setTipoSeleccionado] = useState<'RIMAC' | 'MAPFRE' | 'PACIFICO' | 'LA_POSITIVA' | 'INTERSEGURO' | 'TALLER' | null>(null)
+  const [alertaTipoMismatch, setAlertaTipoMismatch] = useState<string | null>(null)
   const [candidatos, setCandidatos] = useState<{
     seguros: string[];
     entidades: string[];
@@ -190,6 +192,7 @@ export default function NuevoSiniestroPage() {
       const archivoProcesado = new File([imagenMejorada], file.name, { type: 'image/jpeg' })
       const fd = new FormData()
       fd.append('imagen', archivoProcesado)
+      fd.append('tipo_seleccionado', tipoSeleccionado || 'TALLER')
       const res = await fetch('/api/scan-orden', { method: 'POST', body: fd })
       const result = await res.json()
       // Siempre guardamos el resultado para debug, exitoso o fallido
@@ -200,6 +203,10 @@ export default function NuevoSiniestroPage() {
         return
       }
       const d = result.data
+      // Si hay alerta de mismatch de tipo, mostrarla
+      if (d.alerta_tipo_seguro) {
+        setAlertaTipoMismatch(d.alerta_tipo_seguro)
+      }
       // Guardar candidatos para sugerencias de UI
       setCandidatos({
         seguros: d.candidatos?.seguros || [],
@@ -349,7 +356,47 @@ export default function NuevoSiniestroPage() {
               <Camera size={18} className="text-[#00D4FF]" />
               <h2 className="font-syne font-semibold text-white">Escanear orden</h2>
             </div>
-            <p className="text-xs text-[#475569] mb-4">Toma foto de la orden y los datos se cargan automáticamente.</p>
+
+            {/* Selector de tipo de aseguradora (obligatorio antes de subir) */}
+            {!imagenPreview && (
+              <div className="mb-4">
+                <p className="text-xs text-[#94A3B8] mb-2">¿De qué tipo es la orden?</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {[
+                    { v: 'RIMAC', label: 'RIMAC' },
+                    { v: 'MAPFRE', label: 'MAPFRE' },
+                    { v: 'PACIFICO', label: 'PACIFICO' },
+                    { v: 'LA_POSITIVA', label: 'LA POSITIVA' },
+                    { v: 'INTERSEGURO', label: 'INTERSEGURO' },
+                    { v: 'TALLER', label: 'TALLER PARTICULAR' },
+                  ].map(t => (
+                    <button
+                      key={t.v}
+                      type="button"
+                      onClick={() => setTipoSeleccionado(t.v as any)}
+                      className={`text-xs px-3 py-3 rounded-xl border font-semibold transition-all ${
+                        tipoSeleccionado === t.v
+                          ? 'bg-[#00D4FF] text-[#080B12] border-[#00D4FF]'
+                          : 'bg-[#131920] text-[#94A3B8] border-[#1E2D42] hover:text-white hover:border-[#00D4FF]/30'
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+                {tipoSeleccionado && (
+                  <p className="text-[10px] text-green-400 mt-2">
+                    ✓ Listo. Toma o sube la foto de la orden.
+                  </p>
+                )}
+              </div>
+            )}
+
+            <p className="text-xs text-[#475569] mb-4">
+              {tipoSeleccionado
+                ? 'Toma foto de la orden y los datos se cargan automáticamente.'
+                : 'Selecciona primero el tipo de orden, luego sube la imagen.'}
+            </p>
             {scanLoading ? (
               <div className="flex flex-col items-center gap-3 py-6">
                 {imagenPreview && <img src={imagenPreview} alt="Orden" className="w-40 h-40 object-cover rounded-xl opacity-50" />}
@@ -378,13 +425,19 @@ export default function NuevoSiniestroPage() {
               </div>
             ) : (
               <div className="flex gap-3">
-                <button onClick={() => cameraInputRef.current?.click()}
-                  className="flex-1 flex flex-col items-center gap-2 py-5 bg-[#131920] hover:bg-[#1A2332] border border-[#1E2D42] hover:border-[#00D4FF]/30 rounded-xl transition-all">
+                <button
+                  onClick={() => cameraInputRef.current?.click()}
+                  disabled={!tipoSeleccionado}
+                  className="flex-1 flex flex-col items-center gap-2 py-5 bg-[#131920] hover:bg-[#1A2332] border border-[#1E2D42] hover:border-[#00D4FF]/30 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#131920] disabled:hover:border-[#1E2D42]"
+                >
                   <Camera size={24} className="text-[#00D4FF]" />
                   <span className="text-xs text-[#94A3B8]">Tomar foto</span>
                 </button>
-                <button onClick={() => fileInputRef.current?.click()}
-                  className="flex-1 flex flex-col items-center gap-2 py-5 bg-[#131920] hover:bg-[#1A2332] border border-[#1E2D42] hover:border-[#00D4FF]/30 rounded-xl transition-all">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={!tipoSeleccionado}
+                  className="flex-1 flex flex-col items-center gap-2 py-5 bg-[#131920] hover:bg-[#1A2332] border border-[#1E2D42] hover:border-[#00D4FF]/30 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#131920] disabled:hover:border-[#1E2D42]"
+                >
                   <Upload size={24} className="text-[#7C3AED]" />
                   <span className="text-xs text-[#94A3B8]">Subir imagen</span>
                 </button>
@@ -719,6 +772,50 @@ export default function NuevoSiniestroPage() {
                 className="text-sm bg-[#131920] border border-[#1E2D42] text-[#94A3B8] hover:text-white px-4 py-2 rounded-lg"
               >
                 Continuar igual
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal alerta de tipo mismatch (usuario eligió X pero parece ser Y) */}
+      {alertaTipoMismatch && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0D1117] border border-amber-500/30 rounded-2xl p-5 max-w-md w-full space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                <span className="text-amber-400 text-xl">⚠</span>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-syne font-bold text-white">Tipo de orden no coincide</h3>
+                <p className="text-xs text-[#94A3B8] mt-1">
+                  Seleccionaste <span className="text-[#00D4FF] font-semibold">{tipoSeleccionado?.replace('_', ' ')}</span>{' '}
+                  pero la imagen parece ser de{' '}
+                  <span className="text-amber-400 font-semibold">{alertaTipoMismatch.replace('_', ' ')}</span>.
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-[#475569]">
+              Los datos pueden estar mal extraídos. Te recomendamos volver a escanear con el tipo correcto.
+            </p>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setTipoSeleccionado(alertaTipoMismatch as any)
+                  setAlertaTipoMismatch(null)
+                  limpiarFormulario()
+                }}
+                className="flex-1 btn-primary text-sm py-2"
+              >
+                Cambiar a {alertaTipoMismatch.replace('_', ' ')}
+              </button>
+              <button
+                onClick={() => setAlertaTipoMismatch(null)}
+                className="text-sm bg-[#131920] border border-[#1E2D42] text-[#94A3B8] hover:text-white px-4 py-2 rounded-lg"
+              >
+                Continuar
               </button>
             </div>
           </div>

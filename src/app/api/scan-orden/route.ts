@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createSupabase } from '@supabase/supabase-js'
+import { getPromptPorTipo } from './prompts'
 
 // Sharp + GPT-4o-mini requieren Node runtime (no edge)
 export const runtime = 'nodejs'
@@ -520,6 +521,11 @@ export async function POST(request: NextRequest) {
     const file = formData.get('imagen') as File
     if (!file) return NextResponse.json({ error: 'No se recibio imagen' }, { status: 400 })
 
+    // Recibir el tipo de seguro seleccionado por el usuario
+    const tipoSeleccionado = (formData.get('tipo_seleccionado') as string || 'TALLER') as
+      'RIMAC' | 'MAPFRE' | 'PACIFICO' | 'LA_POSITIVA' | 'INTERSEGURO' | 'TALLER'
+    debugLog.push({ campo: 'tipo_seleccionado', valor: tipoSeleccionado })
+
     const bytes = await file.arrayBuffer()
     const { base64, mimeType } = await optimizarImagen(bytes)
 
@@ -559,6 +565,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Saldo OCR insuficiente.' }, { status: 402 })
     }
 
+    // Obtener prompt específico para el tipo seleccionado
+    const promptEspecifico = getPromptPorTipo(tipoSeleccionado)
+
     // ── PASO 2: GPT extrae datos y candidatos ──
     // Estructura optimizada para prompt caching:
     // - system: prompt fijo (OpenAI lo cachea automáticamente al 50% en llamadas siguientes en ~5min)
@@ -574,7 +583,7 @@ export async function POST(request: NextRequest) {
         messages: [
           {
             role: 'system',
-            content: PROMPT,  // Prompt fijo al inicio - se cachea
+            content: promptEspecifico,  // Prompt específico del tipo elegido - se cachea
           },
           {
             role: 'user',
@@ -816,13 +825,28 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Detectar mismatch entre tipo seleccionado y tipo detectado por GPT
+    let alertaTipoSeguro: string | null = null
+    const tipoDetectadoGPT = (data.tipo_seguro_detectado || '').toUpperCase().trim()
+    if (
+      tipoDetectadoGPT &&
+      tipoDetectadoGPT !== tipoSeleccionado &&
+      tipoDetectadoGPT !== 'TALLER' &&  // GPT puede decir TALLER si no está seguro
+      tipoSeleccionado !== 'TALLER'    // si usuario eligió TALLER, no alertar
+    ) {
+      alertaTipoSeguro = tipoDetectadoGPT
+    }
+
     const output: any = {
       numero_siniestro: data.numero_siniestro || null,
       numero_orden: data.numero_orden || null,
       marca: data.marca || null,
       placa: data.placa || null,
       color: data.color || null,
-      tipo_seguro: tipoSeguroFinal || null,
+      tipo_seguro: tipoSeguroFinal || tipoSeleccionado,  // Default al elegido por usuario
+      tipo_seguro_seleccionado: tipoSeleccionado,
+      tipo_seguro_detectado: tipoDetectadoGPT || null,
+      alerta_tipo_seguro: alertaTipoSeguro,  // Avisar al frontend si hay mismatch
       nombre_girador: giradorFinal,
       taller_origen: tallerFinal,
       monto_total,
