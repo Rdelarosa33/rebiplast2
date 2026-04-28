@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createSupabase } from '@supabase/supabase-js'
 
+// Sharp + GPT-4o-mini requieren Node runtime (no edge)
+export const runtime = 'nodejs'
+export const maxDuration = 30
+
 // ============================================================
 // NORMALIZACIÓN
 // ============================================================

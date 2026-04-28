@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import AsignarPieza from './AsignarPieza'
 
 interface Trabajador {
@@ -18,6 +17,7 @@ interface Pieza {
   requiere_reparacion: boolean
   requiere_pintura: boolean
   requiere_pulido: boolean
+  es_faro?: boolean
   siniestro: { numero_siniestro: string, placa: string }
 }
 
@@ -32,6 +32,15 @@ export default function PorAsignarList({ piezas, trabajadores }: { piezas: Pieza
     setLista(prev => prev.filter(p => p.id !== piezaId))
     // Actualizar carga del trabajador
     setCargas(prev => ({ ...prev, [trabajadorId]: (prev[trabajadorId] || 0) + 1 }))
+  }
+
+  const handleFlagsChange = (piezaId: string, flags: {
+    requiere_reparacion: boolean
+    requiere_pintura: boolean
+    requiere_pulido: boolean
+    es_faro: boolean
+  }) => {
+    setLista(prev => prev.map(p => p.id === piezaId ? { ...p, ...flags } : p))
   }
 
   const trabajadoresConCargaActual = trabajadores.map(t => ({
@@ -59,13 +68,21 @@ export default function PorAsignarList({ piezas, trabajadores }: { piezas: Pieza
                 {p.requiere_reparacion && <span className="text-xs text-amber-400">Rep</span>}
                 {p.requiere_pintura && <span className="text-xs text-pink-400">Pin</span>}
                 {p.requiere_pulido && <span className="text-xs text-rose-400">Pul</span>}
+                {p.es_faro && <span className="text-xs text-cyan-400">Faro</span>}
               </div>
             </div>
           </div>
           <AsignarPieza
             piezaId={p.id}
             trabajadores={trabajadoresConCargaActual}
+            flagsIniciales={{
+              requiere_reparacion: p.requiere_reparacion,
+              requiere_pintura: p.requiere_pintura,
+              requiere_pulido: p.requiere_pulido,
+              es_faro: p.es_faro ?? false,
+            }}
             onAsignado={(_, trabajadorId) => handleAsignado(p.id, trabajadorId)}
+            onFlagsChange={flags => handleFlagsChange(p.id, flags)}
           />
         </div>
       ))}
