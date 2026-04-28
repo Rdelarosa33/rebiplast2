@@ -150,13 +150,73 @@ PACIFICO/EA Corp: cada fila OPERACION/DESCRIPCION = pieza
 Qualitat/INTERSEGURO: piezas SOLO en Observaciones. Ignorar tabla montos.
 Revisar siempre Observaciones para piezas adicionales.
 
-Pieza: nombre, lado(LH=Izquierdo/RH=Derecho/DELT=Frontal/POST=Posterior/N/A), requiere_reparacion(REP), requiere_pintura(PINTURA/RP), es_faro(FARO/NEBLINERO), requiere_pulido(PULIDO/faro sin cambio), tipo_trabajo(R/P/RP/PU)
+Pieza: nombre, lado(LH=Izquierdo/RH=Derecho/DELT=Frontal/POST=Posterior/N/A), requiere_reparacion(REP), requiere_pintura(PINTURA/RP), es_faro(FARO/NEBLINERO), requiere_pulido(PULIDO/faro sin cambio), tipo_trabajo(R=solo reparación / RP=reparación+pintura / RPP=reparación+pintura+pulido faro / PU=solo pulido)
 Ignorar: SUBTOTAL, IGV, TOTAL, Planchado/Pintura/Mecanica como categorias.
 
 {"numero_siniestro":null,"numero_orden":null,"marca":null,"placa":null,"color":null,"tipo_seguro":null,"nombre_girador":null,"taller_origen":null,"datos_extra":{"expediente":null,"poliza":null,"modelo":null,"anio":null,"vin":null,"nombre_asegurado":null,"telefono_asegurado":null,"observaciones_orden":null},"candidatos":{"seguros":[],"giradores":[],"talleres":[]},"piezas":[{"nombre":"","lado":"N/A","requiere_reparacion":false,"requiere_pintura":false,"es_faro":false,"requiere_pulido":false,"tipo_trabajo":null}]}`
 
 function limpiarJSON(text: string): string {
   return text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+}
+
+// Repara JSON truncado cerrando strings, arrays y objects pendientes.
+// Útil cuando max_tokens corta la respuesta de GPT a mitad.
+function repararJSONTruncado(text: string): string {
+  let s = text
+
+  // Eliminar comas finales seguidas de cierre
+  s = s.replace(/,\s*([}\]])/g, '$1')
+
+  // Contar comillas no escapadas para saber si quedó string abierto
+  let dentroDeString = false
+  let escape = false
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i]
+    if (escape) { escape = false; continue }
+    if (c === '\\') { escape = true; continue }
+    if (c === '"') dentroDeString = !dentroDeString
+  }
+  if (dentroDeString) s += '"'
+
+  // Cerrar arrays y objetos pendientes contando aperturas vs cierres
+  let abrirObj = 0, abrirArr = 0
+  let inStr = false; let esc = false
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i]
+    if (esc) { esc = false; continue }
+    if (c === '\\') { esc = true; continue }
+    if (c === '"') { inStr = !inStr; continue }
+    if (inStr) continue
+    if (c === '{') abrirObj++
+    else if (c === '}') abrirObj--
+    else if (c === '[') abrirArr++
+    else if (c === ']') abrirArr--
+  }
+
+  // Si la última pieza está incompleta, intentar cerrarla limpiamente
+  // quitando coma final si la hay
+  s = s.replace(/,\s*$/, '')
+
+  while (abrirArr-- > 0) s += ']'
+  while (abrirObj-- > 0) s += '}'
+
+  return s
+}
+
+function parsearGPT(text: string): any {
+  const limpio = limpiarJSON(text)
+  try {
+    return JSON.parse(limpio)
+  } catch (e) {
+    // Intentar reparar JSON truncado y volver a parsear
+    const reparado = repararJSONTruncado(limpio)
+    try {
+      return JSON.parse(reparado)
+    } catch (e2) {
+      console.error('JSON irrecuperable:', limpio.slice(0, 500))
+      throw new Error('GPT devolvió JSON inválido (probablemente truncado). Reintenta el escaneo.')
+    }
+  }
 }
 
 // ============================================================
@@ -211,8 +271,9 @@ export async function POST(request: NextRequest) {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
-        max_tokens: 500,
+        max_tokens: 2000,
         temperature: 0,
+        response_format: { type: 'json_object' },
         messages: [{
           role: 'user',
           content: [
@@ -226,8 +287,7 @@ export async function POST(request: NextRequest) {
     const result = await res.json()
     if (result.error) throw new Error(result.error.message)
 
-    const jsonText = limpiarJSON(result.choices?.[0]?.message?.content || '')
-    const data = JSON.parse(jsonText)
+    const data = parsearGPT(result.choices?.[0]?.message?.content || '')
     const candidatos = data.candidatos || { seguros: [], giradores: [], talleres: [] }
 
     // ── PASO 3: Extraer monto con regex ──
