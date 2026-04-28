@@ -3,7 +3,7 @@ import { getCurrentUser } from '@/lib/actions'
 import { redirect } from 'next/navigation'
 import { CreditCard, Bug, Wrench } from 'lucide-react'
 import Link from 'next/link'
-import MantenimientoClient from './MantenimientoClient'
+import GestionPagos from './GestionPagos'
 
 export const revalidate = 0
 
@@ -13,29 +13,26 @@ export default async function MantenimientoPage() {
 
   const supabase = await createClient()
   const [
+    { data: sus },
     { data: cred },
     { data: usoMes },
     { data: recargas },
     { data: usoHistorial },
+    { data: pagosSus },
   ] = await Promise.all([
+    supabase.from('suscripcion').select('*').single(),
     supabase.from('creditos_ocr').select('*').single(),
     supabase.from('uso_ocr').select('costo, exitoso, created_at')
       .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()),
     supabase.from('recargas_ocr').select('*').order('created_at', { ascending: false }).limit(50),
     supabase.from('uso_ocr').select('id, created_at, seguro_detectado, numero_siniestro, costo, exitoso, piezas_extraidas')
       .order('created_at', { ascending: false }).limit(20),
+    supabase.from('pagos_suscripcion').select('*').order('created_at', { ascending: false }).limit(50),
   ])
 
   const gastoMes = usoMes?.reduce((acc: number, u: any) => acc + (u.exitoso ? Number(u.costo) : 0), 0) || 0
   const escaneosExitosos = usoMes?.filter((u: any) => u.exitoso).length || 0
   const escaneosFallidos = usoMes?.filter((u: any) => !u.exitoso).length || 0
-
-  // Cálculos de deuda y pagado
-  const recargasAuto = recargas?.filter((r: any) => r.automatica) || []
-  const deudaPendientes = recargasAuto.filter((r: any) => !r.pagada)
-  const deudaTotal = deudaPendientes.reduce((acc: number, r: any) => acc + Number(r.monto), 0)
-  const pagosRealizados = recargasAuto.filter((r: any) => r.pagada)
-  const totalPagado = pagosRealizados.reduce((acc: number, r: any) => acc + Number(r.monto), 0)
 
   return (
     <div className="space-y-5 max-w-3xl mx-auto">
@@ -45,7 +42,7 @@ export default async function MantenimientoPage() {
             <Wrench size={22} className="text-slate-400" />
             Mantenimiento
           </h1>
-          <p className="text-sm text-[#475569] mt-0.5">Panel exclusivo de gestión técnica y créditos OCR</p>
+          <p className="text-sm text-[#475569] mt-0.5">Panel exclusivo de gestión técnica, créditos y pagos</p>
         </div>
         <Link
           href="/admin/diagnostico-ocr"
@@ -56,7 +53,7 @@ export default async function MantenimientoPage() {
         </Link>
       </div>
 
-      {/* Créditos OCR — métricas */}
+      {/* Métricas OCR */}
       <div className="card p-5">
         <div className="flex items-center gap-2 mb-4">
           <CreditCard size={18} className="text-[#00D4FF]" />
@@ -84,24 +81,13 @@ export default async function MantenimientoPage() {
         )}
       </div>
 
-      {/* Resumen deuda y pagos */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="card p-4 border-amber-500/30">
-          <p className="text-xs text-[#475569]">Deuda acumulada</p>
-          <p className="text-3xl font-syne font-bold text-amber-400 mt-1">${deudaTotal.toFixed(2)}</p>
-          <p className="text-xs text-[#475569] mt-1">{deudaPendientes.length} recarga{deudaPendientes.length !== 1 ? 's' : ''} pendiente{deudaPendientes.length !== 1 ? 's' : ''}</p>
-        </div>
-        <div className="card p-4 border-green-500/30">
-          <p className="text-xs text-[#475569]">Total pagado</p>
-          <p className="text-3xl font-syne font-bold text-green-400 mt-1">${totalPagado.toFixed(2)}</p>
-          <p className="text-xs text-[#475569] mt-1">{pagosRealizados.length} pago{pagosRealizados.length !== 1 ? 's' : ''} registrado{pagosRealizados.length !== 1 ? 's' : ''}</p>
-        </div>
-      </div>
-
-      <MantenimientoClient
+      <GestionPagos
         recargas={recargas || []}
         usoHistorial={usoHistorial || []}
         escaneosFallidos={escaneosFallidos}
+        pagosSus={pagosSus || []}
+        puedeModificar={true}
+        precioPlan={sus?.precio_mensual || 300}
       />
     </div>
   )
