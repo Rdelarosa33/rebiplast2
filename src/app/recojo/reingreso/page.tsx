@@ -16,7 +16,7 @@ export default async function ReingresoPage() {
   const { data: piezas } = await supabase
     .from('piezas')
     .select(`
-      id, nombre, lado, tipo_trabajo, monto, updated_at,
+      id, nombre, lado, tipo_trabajo, precio, updated_at,
       siniestro:siniestros (
         id, numero_siniestro, numero_orden,
         marca, placa, taller_origen, tipo_seguro

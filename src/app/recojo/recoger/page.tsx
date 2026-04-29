@@ -16,7 +16,7 @@ export default async function RecogerPage() {
   const { data: piezas } = await supabase
     .from('piezas')
     .select(`
-      id, nombre, lado, tipo_trabajo, monto,
+      id, nombre, lado, tipo_trabajo, precio,
       siniestro:siniestros (
         id, numero_siniestro, numero_orden,
         marca, placa, taller_origen, tipo_seguro

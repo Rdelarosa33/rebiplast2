@@ -11,7 +11,7 @@ interface Pieza {
   nombre: string
   lado: string
   tipo_trabajo: string
-  monto: number | null
+  precio: number | null
   updated_at: string | null
   siniestro: {
     id: string
