@@ -64,9 +64,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     ...(['admin', 'supervisor', 'recojo', 'recojo_trabajador'].includes(profile?.role || '')
       ? [{ href: '/siniestros/nuevo', icon: Plus, label: 'Escanear orden' }]
       : []),
-    ...((profile?.role !== 'recojo' && profile?.role !== 'recojo_trabajador')
-      ? [{ href: '/pieza/escanear', icon: QrCode, label: 'Escanear pieza' }]
-      : []),
+    { href: '/pieza/escanear', icon: QrCode, label: 'Escanear pieza' },
     ...(['trabajador','recojo_trabajador'].includes(profile?.role || '')
       ? [{ href: '/trabajador', icon: Hammer, label: 'Mis Piezas' }]
       : []),
