@@ -12,7 +12,7 @@ interface Pieza {
   lado: string
   tipo_trabajo: string
   monto: number | null
-  fecha_entrega: string | null
+  updated_at: string | null
   siniestro: {
     id: string
     numero_siniestro: string
@@ -118,7 +118,7 @@ export default function ReingresoClient({ piezas }: { piezas: Pieza[] }) {
                     {p.siniestro?.numero_siniestro || '(sin N°)'} · {p.siniestro?.marca} {p.siniestro?.placa} · {p.siniestro?.taller_origen}
                   </p>
                   <p className="text-[10px] text-[#475569] mt-0.5">
-                    Entregada: {fechaCorta(p.fecha_entrega)}
+                    Entregada: {fechaCorta(p.updated_at)}
                   </p>
                 </div>
               </div>

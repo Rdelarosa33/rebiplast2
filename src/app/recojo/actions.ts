@@ -100,7 +100,6 @@ export async function entregarPiezasAlTaller(piezaIds: string[]) {
     .from('piezas')
     .update({
       estado: 'ENTREGADO',
-      fecha_entrega: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
     .in('id', piezaIds)
@@ -139,7 +138,7 @@ export async function registrarReingreso(
   // Verificar que la pieza esté ENTREGADO
   const { data: pieza, error: errLeer } = await supabase
     .from('piezas')
-    .select('id, estado, siniestro_id, fecha_entrega')
+    .select('id, estado, siniestro_id, updated_at')
     .eq('id', piezaId)
     .single()
   if (errLeer || !pieza) throw new Error('Pieza no encontrada')
@@ -164,7 +163,7 @@ export async function registrarReingreso(
     motivo,
     comentario: comentario || null,
     registrado_por: profile.id,
-    fecha_entrega_original: pieza.fecha_entrega,
+    fecha_entrega_original: pieza.updated_at,
   })
   if (errEvento) throw new Error(errEvento.message)
 

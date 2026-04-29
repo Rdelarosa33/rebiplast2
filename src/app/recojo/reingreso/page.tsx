@@ -16,14 +16,14 @@ export default async function ReingresoPage() {
   const { data: piezas } = await supabase
     .from('piezas')
     .select(`
-      id, nombre, lado, tipo_trabajo, monto, fecha_entrega,
+      id, nombre, lado, tipo_trabajo, monto, updated_at,
       siniestro:siniestros (
         id, numero_siniestro, numero_orden,
         marca, placa, taller_origen, tipo_seguro
       )
     `)
     .eq('estado', 'ENTREGADO')
-    .order('fecha_entrega', { ascending: false })
+    .order('updated_at', { ascending: false })
     .limit(200)
 
   return <ReingresoClient piezas={(piezas as any) || []} />
