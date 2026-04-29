@@ -66,7 +66,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         ]
       : []),
     ...(profile?.role === 'admin'
-      ? [{ href: '/admin/usuarios', icon: UserCog, label: 'Usuarios' }, { href: '/admin/suscripcion', icon: CreditCard, label: 'Suscripción' }]
+      ? [
+          { href: '/admin/usuarios', icon: UserCog, label: 'Usuarios' },
+          { href: '/admin/suscripcion', icon: CreditCard, label: 'Suscripción' },
+          { href: '/admin/catalogo', icon: Package, label: 'Catálogo' },
+        ]
       : []),
     ...(profile?.role === 'owner'
       ? [{ href: '/admin/suscripcion', icon: CreditCard, label: 'Suscripción' }]
