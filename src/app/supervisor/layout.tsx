@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Profile, ROLE_LABELS, ROLE_COLOR } from '@/types'
 import {
   LayoutDashboard, ClipboardList, QrCode, Users, UserCog, CreditCard,
-  LogOut, Wrench, ShieldCheck, Hammer, Package, RefreshCw,
+  LogOut, Wrench, ShieldCheck, Hammer, Package, RefreshCw, RotateCcw,
   ChevronLeft, ChevronRight, X, Menu
 } from 'lucide-react'
 
