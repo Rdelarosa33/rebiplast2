@@ -13,12 +13,16 @@ async function getUserAndProfile() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, role')
+    .select('id, role, nombre, apellido')
     .eq('id', user.id)
     .single()
 
   if (!profile) throw new Error('Sin perfil')
   return { supabase, user, profile }
+}
+
+function nombreCompleto(p: any) {
+  return [p.nombre, p.apellido].filter(Boolean).join(' ').trim() || 'Sistema'
 }
 
 function asegurarRolEs(profile: any, ...roles: string[]) {
@@ -67,7 +71,10 @@ export async function recogerPiezasDelTaller(piezaIds: string[]) {
       estado_anterior: 'REGISTRADO',
       estado_nuevo: 'RECIBIDO',
       usuario_id: profile.id,
-      nota: 'Recogido en taller',
+      usuario_nombre: nombreCompleto(profile),
+      usuario_role: profile.role,
+      accion: 'recoger_taller',
+      motivo: 'Recogido en taller',
     }).select()
   }
 
@@ -111,7 +118,10 @@ export async function entregarPiezasAlTaller(piezaIds: string[]) {
       estado_anterior: 'LISTO_ENTREGA',
       estado_nuevo: 'ENTREGADO',
       usuario_id: profile.id,
-      nota: 'Entregado al taller',
+      usuario_nombre: nombreCompleto(profile),
+      usuario_role: profile.role,
+      accion: 'entregar_taller',
+      motivo: 'Entregado al taller',
     }).select()
   }
 
@@ -173,7 +183,10 @@ export async function registrarReingreso(
     estado_anterior: 'ENTREGADO',
     estado_nuevo: 'DEVUELTO',
     usuario_id: profile.id,
-    nota: `Reingreso: ${motivo}${comentario ? ' - ' + comentario : ''}`,
+    usuario_nombre: nombreCompleto(profile),
+    usuario_role: profile.role,
+    accion: 'registrar_reingreso',
+    motivo: `Reingreso: ${motivo}${comentario ? ' - ' + comentario : ''}`,
   })
 
   revalidatePath('/recojo')
@@ -220,7 +233,10 @@ export async function resolverReingreso(
       estado_anterior: 'DEVUELTO',
       estado_nuevo: 'RECIBIDO',
       usuario_id: profile.id,
-      nota: 'Reingreso aprobado, reasignado',
+      usuario_nombre: nombreCompleto(profile),
+      usuario_role: profile.role,
+      accion: 'aprobar_reingreso',
+      motivo: 'Reingreso aprobado, reasignado a trabajador',
     })
   } else {
     // Rechazar reingreso → pieza vuelve a ENTREGADO
@@ -234,7 +250,10 @@ export async function resolverReingreso(
       estado_anterior: 'DEVUELTO',
       estado_nuevo: 'ENTREGADO',
       usuario_id: profile.id,
-      nota: 'Reingreso rechazado por supervisor',
+      usuario_nombre: nombreCompleto(profile),
+      usuario_role: profile.role,
+      accion: 'rechazar_reingreso',
+      motivo: 'Reingreso rechazado por supervisor',
     })
   }
 

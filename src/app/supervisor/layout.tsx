@@ -8,7 +8,7 @@ import { Profile, ROLE_LABELS, ROLE_COLOR } from '@/types'
 import {
   LayoutDashboard, ClipboardList, QrCode, Users, UserCog, CreditCard,
   LogOut, Wrench, ShieldCheck, Hammer, Package, RefreshCw, RotateCcw,
-  ChevronLeft, ChevronRight, X, Menu
+  ChevronLeft, ChevronRight, X, Menu, Plus
 } from 'lucide-react'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -60,6 +60,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: '/dashboard', icon: LayoutDashboard, label: 'Inicio' },
     ...(profile?.role === 'admin' || profile?.role === 'supervisor' || profile?.role === 'recojo' || profile?.role === 'recojo_trabajador' || profile?.role === 'owner'
       ? [{ href: '/siniestros', icon: ClipboardList, label: 'Siniestros' }]
+      : []),
+    ...(['admin', 'supervisor', 'recojo', 'recojo_trabajador'].includes(profile?.role || '')
+      ? [{ href: '/siniestros/nuevo', icon: Plus, label: 'Escanear orden' }]
       : []),
     ...((profile?.role !== 'recojo' && profile?.role !== 'recojo_trabajador')
       ? [{ href: '/pieza/escanear', icon: QrCode, label: 'Escanear pieza' }]

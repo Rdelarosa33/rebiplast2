@@ -279,7 +279,7 @@ export async function crearSiniestro(formData: FormData) {
         tipo_trabajo: pieza.tipo_trabajo || 'R',
         precio: pieza.precio ? parseFloat(pieza.precio) : null,
         observaciones: pieza.observaciones || null,
-        estado: 'EN_TRASLADO',
+        estado: 'REGISTRADO',
       })
       .select()
       .single()
@@ -289,7 +289,7 @@ export async function crearSiniestro(formData: FormData) {
         pieza_id: piezaData.id,
         siniestro_id: siniestro.id,
         estado_anterior: null,
-        estado_nuevo: 'EN_TRASLADO',
+        estado_nuevo: 'REGISTRADO',
         usuario_id: user.id,
         usuario_nombre: profile ? `${profile.nombre} ${profile.apellido}`.trim() : '',
         usuario_role: profile?.role,
