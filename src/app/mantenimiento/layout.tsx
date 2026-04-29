@@ -34,17 +34,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     router.refresh()
   }
 
-  const [puedeRecoger, setPuedeRecoger] = useState(
-    profile?.role === 'recojo' || profile?.role === 'admin' || profile?.role === 'supervisor'
-  )
+  const [puedeRecoger, setPuedeRecoger] = useState(false)
 
   useEffect(() => {
-    if (profile?.role !== 'trabajador') return
-    const supabase = createClient()
-    const hoy = new Date().toISOString().split('T')[0]
-    supabase.from('habilitaciones_recojo')
-      .select('id').eq('trabajador_id', profile.id).eq('fecha', hoy).maybeSingle()
-      .then(({ data }) => setPuedeRecoger(!!data))
+    if (!profile) {
+      setPuedeRecoger(false)
+      return
+    }
+    if (['recojo', 'recojo_trabajador', 'admin', 'supervisor', 'mantenimiento'].includes(profile.role)) {
+      setPuedeRecoger(true)
+      return
+    }
+    if (profile.role === 'trabajador') {
+      const supabase = createClient()
+      const hoy = new Date().toISOString().split('T')[0]
+      supabase.from('habilitaciones_recojo')
+        .select('id').eq('trabajador_id', profile.id).eq('fecha', hoy).maybeSingle()
+        .then(({ data }) => setPuedeRecoger(!!data))
+    } else {
+      setPuedeRecoger(false)
+    }
   }, [profile?.id, profile?.role])
 
   const navItems = [
