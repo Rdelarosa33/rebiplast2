@@ -62,6 +62,10 @@ export default function NuevoSiniestroPage() {
   const [sugerenciasTaller, setSugerenciasTaller] = useState<string[]>([])
   const [mostrarSugerenciasTaller, setMostrarSugerenciasTaller] = useState(false)
   const [tallerBuscando, setTallerBuscando] = useState(false)
+  // Autocomplete de giradores filtrado por aseguradora
+  const [sugerenciasGirador, setSugerenciasGirador] = useState<string[]>([])
+  const [mostrarSugerenciasGirador, setMostrarSugerenciasGirador] = useState(false)
+  const [giradorBuscando, setGiradorBuscando] = useState(false)
   const [candidatos, setCandidatos] = useState<{
     seguros: string[];
     entidades: string[];
@@ -569,7 +573,61 @@ export default function NuevoSiniestroPage() {
                     : <span className="text-[9px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded">REVISAR</span>
                   )}
                 </label>
-                <input className="input-field" value={form.nombre_girador} onChange={e => setForm({...form, nombre_girador: e.target.value})} />
+                <div className="relative">
+                  <input
+                    className="input-field"
+                    value={form.nombre_girador}
+                    onChange={async (e) => {
+                      const v = e.target.value
+                      setForm({...form, nombre_girador: v})
+                      if (v.length >= 2) {
+                        setGiradorBuscando(true)
+                        setMostrarSugerenciasGirador(true)
+                        try {
+                          const url = `/api/buscar-giradores?q=${encodeURIComponent(v)}&aseguradora=${encodeURIComponent(form.tipo_seguro)}`
+                          const res = await fetch(url)
+                          const data = await res.json()
+                          setSugerenciasGirador(data.giradores || [])
+                        } catch {
+                          setSugerenciasGirador([])
+                        }
+                        setGiradorBuscando(false)
+                      } else {
+                        setSugerenciasGirador([])
+                        setMostrarSugerenciasGirador(false)
+                      }
+                    }}
+                    onFocus={() => {
+                      if (sugerenciasGirador.length > 0) setMostrarSugerenciasGirador(true)
+                    }}
+                    onBlur={() => {
+                      setTimeout(() => setMostrarSugerenciasGirador(false), 150)
+                    }}
+                  />
+                  {mostrarSugerenciasGirador && (sugerenciasGirador.length > 0 || giradorBuscando) && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-[#0D1117] border border-[#1E2D42] rounded-xl shadow-2xl z-30 max-h-56 overflow-y-auto">
+                      {giradorBuscando && (
+                        <div className="px-3 py-2 text-xs text-[#475569]">Buscando...</div>
+                      )}
+                      {!giradorBuscando && sugerenciasGirador.length === 0 && (
+                        <div className="px-3 py-2 text-xs text-[#475569]">Sin coincidencias en BD</div>
+                      )}
+                      {sugerenciasGirador.map((s, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => {
+                            setForm({...form, nombre_girador: s})
+                            setMostrarSugerenciasGirador(false)
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs text-[#94A3B8] hover:bg-[#131920] hover:text-[#00D4FF] border-b border-[#1E2D42] last:border-b-0"
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 {candidatos.candidatos_girador.length > 0 && (
                   <div className="mt-2">
                     <p className="text-[9px] text-[#475569] mb-1">Detectados en la orden (click para usar):</p>
