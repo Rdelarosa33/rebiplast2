@@ -1,11 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import { Profile, ROLE_LABELS, ROLE_COLOR } from '@/types'
 import {
+  RotateCcw, useState, useEffect } from 'react'
+import Link from 'next/link'
+import {
+  RotateCcw, usePathname, useRouter } from 'next/navigation'
+import {
+  RotateCcw, createClient } from '@/lib/supabase/client'
+import {
+  RotateCcw, Profile, ROLE_LABELS, ROLE_COLOR } from '@/types'
+import {
+  RotateCcw,
   LayoutDashboard, ClipboardList, QrCode, Users, UserCog, CreditCard,
   LogOut, Wrench, ShieldCheck, Hammer, Package, RefreshCw,
   ChevronLeft, ChevronRight, X, Menu
@@ -57,12 +62,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       ? [{ href: '/trabajador', icon: Hammer, label: 'Mis Piezas' }]
       : []),
     ...(puedeRecoger
-      ? [{ href: '/siniestros/nuevo', icon: Package, label: 'Recojo' }]
+      ? [{ href: '/recojo', icon: Package, label: 'Recojo' }]
       : []),
     ...(profile?.role === 'admin' || profile?.role === 'supervisor'
       ? [
           { href: '/supervisor', icon: ShieldCheck, label: 'Supervisor' },
           { href: '/supervisor/reasignar', icon: RefreshCw, label: 'Reasignar' },
+          { href: '/supervisor/reingresos', icon: RotateCcw, label: 'Reingresos' },
         ]
       : []),
     ...(profile?.role === 'admin'
