@@ -66,7 +66,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       ? [{ href: '/trabajador', icon: Hammer, label: 'Mis Piezas' }]
       : []),
     ...(puedeRecoger
-      ? [{ href: '/recojo', icon: Package, label: 'Recojo' }]
+      ? [{ href: '/recojo', icon: Package, label: 'Recojo y Entrega' }]
       : []),
     ...(profile?.role === 'admin' || profile?.role === 'supervisor'
       ? [
