@@ -9,7 +9,7 @@ export default async function CatalogoPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, full_name')
+    .select('role')
     .eq('id', user.id)
     .single()
 
