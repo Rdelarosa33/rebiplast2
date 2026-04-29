@@ -1,14 +1,10 @@
 'use client'
 
-import {
-  RotateCcw, useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import {
-  RotateCcw, usePathname, useRouter } from 'next/navigation'
-import {
-  RotateCcw, createClient } from '@/lib/supabase/client'
-import {
-  RotateCcw, Profile, ROLE_LABELS, ROLE_COLOR } from '@/types'
+import { usePathname, useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import { Profile, ROLE_LABELS, ROLE_COLOR } from '@/types'
 import {
   RotateCcw,
   LayoutDashboard, ClipboardList, QrCode, Users, UserCog, CreditCard,
