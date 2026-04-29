@@ -521,32 +521,54 @@ EL USUARIO YA CONFIRMÓ QUE ES INTERSEGURO, ASUME tipo_seguro = "INTERSEGURO".
 Si la imagen NO es para Interseguro, pon tipo_seguro_detectado con el real.
 
 ═══════════════════════════════════════════════════════════════
-ESTRUCTURA TÍPICA (suele venir vía Qualität):
+⛔ REGLA ABSOLUTA: GIRADOR Y TALLER SIEMPRE NULL ⛔
+═══════════════════════════════════════════════════════════════
+
+INTERSEGURO NUNCA incluye girador ni taller en sus órdenes:
+
+- nombre_girador: SIEMPRE null
+- taller_origen: SIEMPRE null
+
+NO importa qué nombres veas en el documento (Qualität, Jefe de Taller,
+Jefe de Siniestros, firmas, sellos, etc.). TODOS son ignorados.
+El usuario completará girador y taller manualmente después.
+
+candidatos.entidades: dejar VACÍO ([]) o solo el nombre del asegurado
+si aparece. NO incluir Qualität ni nombres de jefes/firmantes.
+
+═══════════════════════════════════════════════════════════════
+DATOS QUE SÍ DEBES EXTRAER:
 ═══════════════════════════════════════════════════════════════
 
 - numero_orden: campo "ORDEN DE TRABAJO No." (ej: "15197")
 - numero_siniestro: campo "Siniestro" (ej: "69-013711", con guión)
-- taller_origen: el header del documento
-  Si dice "Qualität", taller = "Qualität"
-  Si es otro nombre, ese es el taller
-- nombre_girador: nombre que firma como "Jefe de Siniestros" o similar
-  Si no hay firma clara, dejar null
 - nombre_asegurado: campo "Asegurado"
 - placa, marca, modelo, año: en "DATOS DE LA POLIZA"
 - moneda: campo "Moneda" (ej: "Dólares Americanos" → USD)
+- monto_total: campo "Total" o "Monto neto sin IGV"
 
 VERIFICAR ASEGURADORA:
 - Buscar "Facturar a:" al final del documento
 - Si dice "INTERSEGURO COMPAÑIA DE SEGUROS S.A" → confirma tipo_seguro = INTERSEGURO
 
+═══════════════════════════════════════════════════════════════
+candidatos.numeros_documento (CRÍTICO - llenar SIEMPRE)
+═══════════════════════════════════════════════════════════════
+
+Listar TODOS los identificadores numéricos visibles:
+- Orden de trabajo (ej: "15197")
+- Siniestro (ej: "69-013711")
+- Póliza (si aparece)
+
+═══════════════════════════════════════════════════════════════
 PIEZAS:
+═══════════════════════════════════════════════════════════════
+
 - Las piezas están en "Observaciones:" como texto libre
   (ej: "REP FUNDA DEL PARACHOQUE / REP Y PULIR FAROS DEL LH Y RH")
 - IGNORAR la tabla de montos genéricos (Planchado, Pintura, Mecánica,
   Reparación, Repuestos) — esas son CATEGORÍAS, no piezas
 - Separar piezas por: comas, "/", saltos de línea, " Y "
-
-MONTO: campo "Total" o "Monto neto sin IGV"
 ${COMUN}`
 
 // =============================================================

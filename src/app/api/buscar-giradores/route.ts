@@ -1,7 +1,8 @@
 // =============================================================
-// API: Buscar giradores - VERSION DEBUG TEMPORAL
+// API: Buscar giradores por aseguradora (autocomplete)
 // =============================================================
-// GET /api/buscar-giradores?q=fer&debug=1  ← agrega &debug=1
+// GET /api/buscar-giradores?q=texto&aseguradora=MAPFRE
+// Retorna: { giradores: ["Nombre 1", "Nombre 2"] }
 // =============================================================
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -19,79 +20,36 @@ function normalizar(texto: string): string {
 }
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const q = searchParams.get('q') || ''
-  const aseguradora = (searchParams.get('aseguradora') || '').toUpperCase()
-  const debug = searchParams.get('debug') === '1'
-
-  const debugInfo: any = {
-    q_recibida: q,
-    aseguradora_recibida: aseguradora,
-    paso: 'inicio',
-  }
-
   try {
+    const { searchParams } = new URL(request.url)
+    const q = searchParams.get('q') || ''
+    const aseguradora = (searchParams.get('aseguradora') || '').toUpperCase()
+
     if (q.length < 2) {
-      debugInfo.paso = 'q_muy_corta'
-      return NextResponse.json({ giradores: [], ...(debug ? { debug: debugInfo } : {}) })
+      return NextResponse.json({ giradores: [] })
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const supabase = createSupabase(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    )
 
-    debugInfo.tiene_url = !!supabaseUrl
-    debugInfo.tiene_key = !!supabaseKey
-
-    if (!supabaseUrl || !supabaseKey) {
-      debugInfo.paso = 'falta_env'
-      return NextResponse.json({ giradores: [], ...(debug ? { debug: debugInfo } : {}) })
-    }
-
-    const supabase = createSupabase(supabaseUrl, supabaseKey, {
-      auth: { autoRefreshToken: false, persistSession: false }
-    })
-
-    // PASO 1: SELECT sin filtros
-    const { data: todos, error: errTodos } = await supabase
-      .from('ref_giradores')
-      .select('nombre, aseguradora, alias, activo')
-
-    debugInfo.total_sin_filtros = todos?.length || 0
-    debugInfo.error_sin_filtros = errTodos?.message || null
-    if (todos && todos.length > 0) {
-      debugInfo.primer_registro = todos[0]
-      debugInfo.aseguradoras_distintas = Array.from(new Set(todos.map((t: any) => t.aseguradora)))
-      debugInfo.tipos_activo = Array.from(new Set(todos.map((t: any) => t.activo)))
-    }
-
-    // PASO 2: con filtro activo
-    const { data: activos, error: errActivos } = await supabase
-      .from('ref_giradores')
-      .select('nombre, aseguradora, alias')
-      .eq('activo', true)
-    debugInfo.total_activos = activos?.length || 0
-    debugInfo.error_activos = errActivos?.message || null
-
-    // PASO 3: con filtro aseguradora
-    let datos: any[] = activos || []
+    let query = supabase.from('ref_giradores').select('nombre, aseguradora, alias').eq('activo', true)
     if (aseguradora) {
-      const { data: filtrados, error: errFiltro } = await supabase
-        .from('ref_giradores')
-        .select('nombre, aseguradora, alias')
-        .eq('activo', true)
-        .eq('aseguradora', aseguradora)
-
-      debugInfo.total_filtrado_aseg = filtrados?.length || 0
-      debugInfo.error_filtro = errFiltro?.message || null
-      datos = filtrados || []
+      query = query.eq('aseguradora', aseguradora)
+    }
+    const { data, error } = await query
+    if (error) {
+      console.error('buscar-giradores error:', error)
+      return NextResponse.json({ giradores: [] })
     }
 
-    // PASO 4: Match
+    const giradores = data || []
     const qNorm = normalizar(q)
-    debugInfo.q_normalizada = qNorm
-
     const resultados: { nombre: string; relevancia: number }[] = []
-    for (const g of datos) {
+
+    for (const g of giradores) {
       const nombreNorm = normalizar(g.nombre || '')
       const aliasNorm: string[] = (g.alias || []).map((a: string) => normalizar(a))
 
@@ -111,19 +69,11 @@ export async function GET(request: NextRequest) {
       return a.nombre.localeCompare(b.nombre)
     })
 
-    debugInfo.matches_encontrados = resultados.length
-    debugInfo.paso = 'fin_ok'
-
     return NextResponse.json({
       giradores: resultados.slice(0, 10).map(r => r.nombre),
-      ...(debug ? { debug: debugInfo } : {}),
     })
   } catch (e: any) {
-    debugInfo.paso = 'excepcion'
-    debugInfo.error_msg = e?.message || String(e)
-    return NextResponse.json(
-      { giradores: [], error: e?.message, ...(debug ? { debug: debugInfo } : {}) },
-      { status: 500 }
-    )
+    console.error('buscar-giradores error:', e)
+    return NextResponse.json({ giradores: [], error: e.message }, { status: 500 })
   }
 }
